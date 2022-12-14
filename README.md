@@ -4,7 +4,18 @@ Tiny dependency injection library for Unity3D based on interface dependency seri
 
 ## Installation
 
-To add this to your project, add a git dependency in your `manifest.json`:
+To add this to your project you can use one of two ways 
+
+- Open `Window/PackageManager`, press plus button, choose `Add package from git URL...` and paste the following
+into it.
+
+```
+https://github.com/nicktgn/unity-humble-di.git
+```
+
+OR
+
+- Add git dependency to `Packages/manifest.json` file in your project directory:
 
 ```
 "studio.lobsters-united.humble-di": "https://github.com/nicktgn/unity-humble-di.git"

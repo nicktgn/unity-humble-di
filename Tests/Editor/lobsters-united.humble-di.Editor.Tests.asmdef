@@ -1,0 +1,25 @@
+{
+    "name": "lobsters-united.humble-di.Editor.Tests",
+    "rootNamespace": "LobstersUnited.HumbleDI.Tests",
+    "references": [
+        "lobsters-united.humble-di",
+        "lobsters-united.humble-di.Editor",
+        "UnityEditor.TestRunner",
+        "UnityEngine.TestRunner"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": true,
+    "precompiledReferences": [
+        "nunit.framework.dll"
+    ],
+    "autoReferenced": false,
+    "defineConstraints": [
+        "UNITY_INCLUDE_TESTS"
+    ],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

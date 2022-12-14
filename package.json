@@ -1,0 +1,21 @@
+{
+    "name": "studio.lobsters-united.humble-di",
+    "version": "0.1.0",
+    "displayName": "Humble DI",
+    "description": "Tiny DI library for Unity3D based on interface dependencies",
+    "unity": "2021.1",
+    "documentationUrl": "https://github.com/nicktgn/unity-humble-di",
+    "changelogUrl": "https://github.com/nicktgn/unity-humble-di/blob/main/CHANGELOG.md",
+    "licensesUrl": "https://github.com/nicktgn/unity-humble-di/blob/main/LICENSE",
+    "keywords": [
+        "dependency injection",
+        "di",
+        "interfaces",
+        "interface serialization"
+    ],
+    "author": {
+        "name": "Lobsters United",
+        "email": "nicktgn@gmail.com",
+        "url": "https://github.com/nicktgn"
+    }
+}

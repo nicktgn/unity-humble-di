@@ -74,5 +74,6 @@ field will highlight the object in Project or Scene view (depending on where it 
 
 ## TODO:
 
-- [ ] Test how serialization and inspector works when non-UnityObject is implementing
-interfaces that are used as fields
+- [ ] Support for serializing fields that are of type collection of interface types (array, list, IEnumerable?)
+    - [ ] Adapt drawer to display custom list field
+- [ ] ProviderAttribute for using POCO objects that implement interfaces as references 

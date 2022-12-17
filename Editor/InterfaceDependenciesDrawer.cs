@@ -445,9 +445,10 @@ namespace LobstersUnited.HumbleDI.Editor {
         }
 
         GUIContent GetContentFromObject(Object obj, Type type) {
+            var typeName = type.GetNameWithGenerics();
             var text = obj == null 
-                ? $"None ({type.Name})" 
-                : $"{obj.name} ({obj.GetType().Name}) ({type.Name})";
+                ? $"None ({typeName})" 
+                : $"{obj.name} ({obj.GetType().Name}) ({typeName})";
             var img = obj == null
                 ? null
                 : EditorGUIUtility.GetIconForObject(obj);

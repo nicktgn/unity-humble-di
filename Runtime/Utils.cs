@@ -45,6 +45,15 @@ namespace LobstersUnited.HumbleDI {
             var fields = type.GetFields(ALL_INSTANCE_FIELDS);
             return fields.FirstOrDefault(field => field.FieldType == fieldType);
         }
+        
+        public static string GetNameWithGenerics(this Type type) {
+            var name = type.IsGenericType ? type.Name.Split('`')[0] : type.Name;
+            if (type.IsGenericType) {
+                var paramStr = type.GetGenericArguments().MapToString(t => t.Name);
+                name += $"<{paramStr}>";
+            }
+            return name;
+        }
 
         public static IEnumerable<ProviderAttribute> GetProviderAttributes(this Type type) {
             return type.GetCustomAttributes<ProviderAttribute>();

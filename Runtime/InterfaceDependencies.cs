@@ -30,6 +30,10 @@ using Object = UnityEngine.Object;
 
 namespace LobstersUnited.HumbleDI {
     
+    public class TargetObjectNotFoundException : Exception {
+        
+    }
+
     [Serializable]
     public class InterfaceDependencies : ISerializationCallbackReceiver {
         
@@ -38,39 +42,124 @@ namespace LobstersUnited.HumbleDI {
         
         public int validationLevel;
         
+        // Unity Object that contains the target object interface fields of which we want to serialize/deserialize 
         [SerializeField] Object target;
+        // Nested path of the field that holds reference to the target object inside the Unity Object 
+        [SerializeField] string targetPath;
+        // Names of the fields inside the target object 
         [SerializeField] string[] fieldNames;
+        // Assembly qualified names of the types for each of the fields we want to serialize
         [SerializeField] string[] fieldTypes;
+        // Mapped Unity Objects assigned to the fields
         [SerializeField] Object[] mappedObjects;
+        // TODO:
+        // Mapped paths to references of each field type inside each mapped Unity Object
+        [SerializeField] string[] mappedPaths;
+        // Sources of each mapped Unity Object (scene or assets)
         [SerializeField] ReferenceSource[] mappedSources;
 
-        public InterfaceDependencies(Object target, int validationLevel = 0) {
-            this.target = target;
+        /// <summary>
+        /// Create new InterfaceDependencies object
+        /// </summary>
+        /// <param name="target">target Unity Object</param>
+        /// <param name="iDepsPath">path of the InterfaceDependencies field (incl. field's name) inside the target Unity Object</param>
+        /// <param name="validationLevel">level of validation to be performed for each mapped field on deserialization</param>
+        public InterfaceDependencies(Object target, string iDepsPath = "", int validationLevel = 0) {
+            SetTarget(target, iDepsPath);
             this.validationLevel = validationLevel;
         }
 
-        internal void SetParent(Object target) {
+        /// <summary>
+        /// Set target Unity Object in which (can be nested) InterfaceDependencies field reside. 
+        /// </summary>
+        /// <param name="target">target Unity Object</param>
+        /// <param name="iDepsPath">path of the InterfaceDependencies field (incl. field's name) inside the target Unity Object</param>
+        internal void SetTarget(Object target, string iDepsPath) {
             this.target = target;
+            targetPath = GetTargetObjectPath(iDepsPath);
         }
 
         public void OnBeforeSerialize() {
-            if (target != null)
-                Serialize(target);
+            // This might be running not on the main thread, need to avoid `== null` comparisons
+            try {
+                var targetObj = GetTargetObject(target, targetPath);
+                Serialize(targetObj);
+            } 
+            #pragma warning disable CS0168
+            catch (NullReferenceException e) {
+                // pass
+            }
+            #pragma warning restore CS0168
         }
         
         public void OnAfterDeserialize() {
-            if (target != null)
-                Deserialize(target);
+            // This might be running not on the main thread, need to avoid `== null` comparisons
+            try {
+                var targetObj = GetTargetObject(target, targetPath);
+                Deserialize(targetObj);
+            }
+            #pragma warning disable CS0168
+            catch (NullReferenceException e) {
+                // pass
+            }
+            #pragma warning restore CS0168
         }
 
-        public void InitData(int count) {
+        /// <summary>
+        /// Determines the path to object containing InterfaceDependencies inside the target Unity Object
+        /// </summary>
+        /// <param name="iDepsPath">path of the InterfaceDependencies field</param>
+        public static string GetTargetObjectPath(string iDepsPath) {
+            var idx = iDepsPath.LastIndexOf('.');
+            return idx < 0 ? null : iDepsPath[..idx];
+        }
+
+        /// <summary>
+        /// Gets the object (that contains InterfaceDependencies) inside the Unity Object based on the field path.
+        /// If field path is null or empty, returns the Unity Object itself.
+        /// </summary>
+        /// <param name="target">Unity Object</param>
+        /// <param name="targetPath">field path inside the Unity Object where actual target object is</param>
+        /// <returns>object</returns>
+        public static object GetTargetObject(Object target, string targetPath) {
+            if (string.IsNullOrEmpty(targetPath)) {
+                return target;
+            }
+            
+            var splitPath = targetPath.Split('.');
+            var targetObj = (object) target;
+            var targetObjType = target.GetType();
+            foreach (var fieldName in splitPath) {
+                var field = targetObjType.GetField(fieldName, Utils.ALL_INSTANCE_FIELDS);
+                if (field == null) {
+                    return null;
+                }
+                targetObj = field.GetValue(targetObj);
+                targetObjType = field.GetType();
+            }
+            return targetObj;
+        }
+        
+        /// <summary>
+        /// Gets the object (that contains InterfaceDependencies) inside the Unity Object based on the field path
+        /// of the InterfaceDependencies field (includes field itself).
+        /// If field path is null, empty or contains only name of InterfaceDependency field itself, returns the provided Unity Object itself.
+        /// </summary>
+        /// <param name="target">Unity Object</param>
+        /// <param name="targetPath">field path inside the Unity Object where actual target object is</param>
+        /// <returns>object</returns>
+        public static object GetTargetObjectRelativeToIDeps(Object target, string iDepsPath) {
+            return GetTargetObject(target, GetTargetObjectPath(iDepsPath));
+        }
+
+        void InitData(int count) {
             fieldNames = new string[count];
             fieldTypes = new string[count];
             mappedObjects = new Object[count];
             mappedSources = new ReferenceSource[count];
         }
 
-        public void Serialize(object obj) {
+        void Serialize(object obj) {
             var fieldsArr = obj.GetType().GetInterfaceFields().ToArray();
             var count = fieldsArr.Length;
             
@@ -95,7 +184,7 @@ namespace LobstersUnited.HumbleDI {
             }
         }
         
-        public void Deserialize(object obj) {
+        void Deserialize(object obj) {
             var dict = obj.GetType()
                 .GetInterfaceFields().ToDictionary(f => f.Name);
             var count = fieldNames.Length;

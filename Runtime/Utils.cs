@@ -22,14 +22,17 @@
 
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 
 namespace LobstersUnited.HumbleDI {
     
     internal static class Utils {
 
+        public static readonly BindingFlags ALL_INSTANCE_FIELDS = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+        
         public static IEnumerable<FieldInfo> GetInterfaceFields(this Type type) {
-            var fields = type.GetFields(BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+            var fields = type.GetFields(ALL_INSTANCE_FIELDS);
             foreach (var field in fields) {
                 if (!field.FieldType.IsInterface)
                     continue;
@@ -38,5 +41,17 @@ namespace LobstersUnited.HumbleDI {
             }
         }
 
+        public static FieldInfo GetInterfaceFieldOfType(this Type type, Type fieldType) {
+            var fields = type.GetFields(ALL_INSTANCE_FIELDS);
+            return fields.FirstOrDefault(field => field.FieldType == fieldType);
+        }
+
+        public static IEnumerable<ProviderAttribute> GetProviderAttributes(this Type type) {
+            return type.GetCustomAttributes<ProviderAttribute>();
+        }
+
+        public static string MapToString<T>(this IEnumerable<T> list, Func<T, string> map, string separator = ", ") {
+            return string.Join(separator, list.Select(map).ToArray());
+        }
     }
 }

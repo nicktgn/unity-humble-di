@@ -2,14 +2,20 @@ using UnityEngine;
 
 namespace LobstersUnited.HumbleDI.Tests {
     
-    public static class A {
+    static class A {
 
-        public static GameObject GO = new GameObject();
+        public static GameObject GO() {
+            return new GameObject();
+        }
 
         public static T Component<T>() where T : Component {
-            return GO.AddComponent<T>();
+            return GO().AddComponent<T>();
+        }
+
+        public static T SO<T>() where T : ScriptableObject {
+            return ScriptableObject.CreateInstance<T>();
         }
 
     }
-    
+
 }

@@ -40,9 +40,20 @@ namespace LobstersUnited.HumbleDI.Editor {
         float lineHeight;
         float totalHeight;
         float pickerWidth => lineHeight + 2f;
+        float indentWidth => EditorGUI.indentLevel * 15;
 
         bool isInit;
+        
+        /// <summary>
+        /// Unity Object target (target of the Inspector)
+        /// </summary>
         Object target;
+       
+        /// <summary>
+        /// Actual c# object which contains InterfaceDependencies field. Can be nested inside of `target` or `target` itself
+        ///  depending on the `SerializedProperty.propertyPath` 
+        /// </summary>
+        object actualTarget;
         
         List<FieldInfo> iFaceFields;
 
@@ -51,7 +62,7 @@ namespace LobstersUnited.HumbleDI.Editor {
 
         SerializedProperty isFoldout;
         static readonly string isFoldoutPropName = "isFoldout";
-        InterfaceDependencies serializationDataRef;
+        InterfaceDependencies iDeps;
 
         Object dndObject;
 
@@ -64,7 +75,7 @@ namespace LobstersUnited.HumbleDI.Editor {
             
             property.serializedObject.Update();
 
-            Enable(property.serializedObject.targetObject, fieldInfo);
+            Enable(property.serializedObject.targetObject, fieldInfo, property.propertyPath);
 
             DrawInterfaceDependenciesGUI(position);
             
@@ -103,17 +114,24 @@ namespace LobstersUnited.HumbleDI.Editor {
             }
             SaveFoldoutState(foldout);
 
+            // EditorGUI.indentLevel = initIndentLevel;
+
             // update full height of the section
             totalHeight = pos.y - startY;
         }
-        
+
         bool DrawFoldout(Rect pos, bool value, string label) {
             var id = GUIUtility.GetControlID(FocusType.Keyboard, pos);
-
-            GUI.Box(pos, GUIContent.none, EditorStyles.helpBox);
+            
+            // adjust for indent
+            var indent = indentWidth;
+            var boxPos = pos;
+            boxPos.x += indent;
+            boxPos.width -= indent;
+            GUI.Box(boxPos, GUIContent.none, EditorStyles.helpBox);
 
             var togglePos = pos;
-            togglePos.x += 4;
+            togglePos.x += 4 + indent;
             togglePos.width = lineHeight;
             togglePos.height = lineHeight;
             var result = EditorGUI.Toggle(togglePos, value, EditorStyles.foldout);
@@ -145,16 +163,17 @@ namespace LobstersUnited.HumbleDI.Editor {
         }
 
         void SaveFoldoutState(bool foldout) {
-            if (foldout == serializationDataRef.isFoldout)
+            if (foldout == iDeps.isFoldout)
                 return;
             // TODO: consider if this is necessary
             // EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
-            serializationDataRef.isFoldout = foldout;
+            iDeps.isFoldout = foldout;
         }
 
         float DrawSeparatorLine(Rect line) {
-            line.x += 15;
-            line.width -= 16;
+            var indent = indentWidth;
+            line.x += 15 + indent;
+            line.width -= 16 + indent;
             line.height = 2.0f;
             EditorGUI.DrawRect(line, Color.gray);
             return line.height;
@@ -162,12 +181,12 @@ namespace LobstersUnited.HumbleDI.Editor {
 
         float DrawDependenciesSectionContentGUI(Rect pos) {
             var startY = pos.y;
-
-            EditorGUI.indentLevel += 1;
-
+            
             pos.y += verticalSpacing;
             pos.y += DrawSeparatorLine(pos);
             pos.y += verticalSpacing;
+            
+            EditorGUI.indentLevel += 1;
             
             for (var i = 0; i < iFaceFields.Count; i++) {
                 var prop = iFaceFields[i];
@@ -239,7 +258,7 @@ namespace LobstersUnited.HumbleDI.Editor {
         // --------------------------------- //
         #region SETUP
 
-        public void Enable(Object target, FieldInfo serializationDataField) {
+        public void Enable(Object target, FieldInfo iDepsField, string iDepsFieldPath) {
             if (isInit) return;
     
             // setup measurements
@@ -247,37 +266,39 @@ namespace LobstersUnited.HumbleDI.Editor {
             verticalSpacing = EditorGUIUtility.standardVerticalSpacing;
 
             this.target = target;
-            BindInterfaceDependencies(serializationDataField);
+            actualTarget = InterfaceDependencies.GetTargetObjectRelativeToIDeps(target, iDepsFieldPath);
+            
+            BindInterfaceDependencies(iDepsField, iDepsFieldPath);
             EnumerateIFaceFields();
             isInit = true;
         }
 
         public void Disable() {
+            isInit = false;
             target = null;
+            actualTarget = null;
             currentEvent = null;
             iFaceFields.Clear();
         }
 
-        void BindInterfaceDependencies(FieldInfo serializationDataField) {
-            var obj = serializationDataField.GetValue(target);
-            serializationDataRef = obj as InterfaceDependencies;
-            
+        void BindInterfaceDependencies(FieldInfo iDepsField, string iDepsFieldPath) {
+            var obj = iDepsField.GetValue(actualTarget);
             switch (obj) {
                 case null:
-                    obj = new InterfaceDependencies(target);
-                    serializationDataField.SetValue(target, obj);
+                    obj = new InterfaceDependencies(target, iDepsFieldPath);
+                    iDepsField.SetValue(actualTarget, obj);
                     break;
                 case InterfaceDependencies iDeps:
-                    iDeps.SetParent(target);
+                    iDeps.SetTarget(target, iDepsFieldPath);
                     break;
             }
+            iDeps = obj as InterfaceDependencies;
         }
 
         void EnumerateIFaceFields() {
-            var type = target.GetType();
-           
             iFaceFields = new List<FieldInfo>();
             
+            var type = actualTarget.GetType();
             foreach (var field in type.GetInterfaceFields()){
                 iFaceFields.Add(field);
             }
@@ -415,12 +436,12 @@ namespace LobstersUnited.HumbleDI.Editor {
             var val = needValidation ? FindComponentOrSO(field, pickedObj) : pickedObj;
                 
             Undo.RecordObject(target, "Set interface field ref");
-            field.SetValue(target, val);
+            field.SetValue(actualTarget, val);
         }
 
         Object GetMappedObjectForField(FieldInfo prop) {
             // TODO: or dnd
-            return prop.GetValue(target) as Object;
+            return prop.GetValue(actualTarget) as Object;
         }
 
         GUIContent GetContentFromObject(Object obj, Type type) {

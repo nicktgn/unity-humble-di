@@ -21,15 +21,19 @@
 // SOFTWARE.
 
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 
 namespace LobstersUnited.HumbleDI {
-    
+
     internal static class Utils {
 
         public static readonly BindingFlags ALL_INSTANCE_FIELDS = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+
+        // ------------------------------------- //
+        #region Type Extensions
         
         public static IEnumerable<FieldInfo> GetInterfaceFields(this Type type) {
             var fields = type.GetFields(ALL_INSTANCE_FIELDS);
@@ -57,6 +61,33 @@ namespace LobstersUnited.HumbleDI {
 
         public static IEnumerable<ProviderAttribute> GetProviderAttributes(this Type type) {
             return type.GetCustomAttributes<ProviderAttribute>();
+        }
+
+        public static FieldType GetFieldType(this Type type) {
+            if (type.IsArray) {
+                return FieldType.ARRAY;
+            }
+            if (typeof(List<>).IsAssignableFrom(type)) {
+                return FieldType.LIST;
+            }
+            if (typeof(IEnumerable).IsAssignableFrom(type)) {
+                return FieldType.UNSUPPORTED;
+            }
+            return FieldType.SINGULAR;
+        }
+        
+        #endregion
+        
+        public static Array CreateArray(Type t, int length = 0) {
+            if (length < 0)
+                throw new ArgumentOutOfRangeException(nameof(length));
+            return (Array) Activator.CreateInstance(t.MakeArrayType(), length);
+        }
+
+        public static System.Collections.IEnumerable CreateList(Type t, int length = 0) {
+            if (length < 0)
+                throw new ArgumentOutOfRangeException(nameof(length));
+            return (Array) Activator.CreateInstance(t, length);
         }
 
         public static string MapToString<T>(this IEnumerable<T> list, Func<T, string> map, string separator = ", ") {

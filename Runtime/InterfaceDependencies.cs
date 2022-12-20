@@ -29,13 +29,24 @@ using Object = UnityEngine.Object;
 
 
 namespace LobstersUnited.HumbleDI {
-    
-    public class TargetObjectNotFoundException : Exception {
-        
-    }
+
+    // internal class TargetNullException : Exception { }
+    //
+    // internal class ValidationFailedException : Exception {
+    //     object target;
+    //     string fieldName;
+    //
+    //     public ValidationFailedException(string fieldName, object target) {
+    //         
+    //     }
+    // }
 
     [Serializable]
     public class InterfaceDependencies : ISerializationCallbackReceiver {
+
+        static readonly string ARRAY_DATA = "Array.data[";
+        static readonly string BRACKET = "[";
+        static readonly char BRACKET_CHAR = '[';
         
         // drawer support
         public bool isFoldout = true;
@@ -84,12 +95,9 @@ namespace LobstersUnited.HumbleDI {
             try {
                 var targetObj = GetTargetObject(target, targetPath);
                 Serialize(targetObj);
-            } 
-            #pragma warning disable CS0168
-            catch (NullReferenceException e) {
+            } catch {
                 // pass
             }
-            #pragma warning restore CS0168
         }
         
         public void OnAfterDeserialize() {
@@ -97,21 +105,25 @@ namespace LobstersUnited.HumbleDI {
             try {
                 var targetObj = GetTargetObject(target, targetPath);
                 Deserialize(targetObj);
-            }
-            #pragma warning disable CS0168
-            catch (NullReferenceException e) {
+            } catch {
                 // pass
             }
-            #pragma warning restore CS0168
         }
 
+        // -------------------------------------- //
+        #region Static Methods
+        
         /// <summary>
         /// Determines the path to object containing InterfaceDependencies inside the target Unity Object
         /// </summary>
         /// <param name="iDepsPath">path of the InterfaceDependencies field</param>
         public static string GetTargetObjectPath(string iDepsPath) {
+            if (string.IsNullOrEmpty(iDepsPath))
+                return null;
             var idx = iDepsPath.LastIndexOf('.');
-            return idx < 0 ? null : iDepsPath[..idx];
+            return idx < 0
+                ? null
+                : iDepsPath[..idx].Replace(ARRAY_DATA, BRACKET);
         }
 
         /// <summary>
@@ -122,20 +134,40 @@ namespace LobstersUnited.HumbleDI {
         /// <param name="targetPath">field path inside the Unity Object where actual target object is</param>
         /// <returns>object</returns>
         public static object GetTargetObject(Object target, string targetPath) {
+            // do this first to trigger null exception if target is null
+            Type targetObjType;
+            try {
+                targetObjType = target.GetType();
+            } catch {
+                return null;
+            }
+
             if (string.IsNullOrEmpty(targetPath)) {
                 return target;
             }
             
             var splitPath = targetPath.Split('.');
             var targetObj = (object) target;
-            var targetObjType = target.GetType();
             foreach (var fieldName in splitPath) {
-                var field = targetObjType.GetField(fieldName, Utils.ALL_INSTANCE_FIELDS);
-                if (field == null) {
-                    return null;
+                // if array or list index
+                if (fieldName[0] == BRACKET_CHAR) {
+                    try {
+                        var idx = int.Parse(fieldName[1..^1]);
+                        targetObj = (targetObj as IEnumerable<object>).ElementAt(idx);
+                        targetObjType = targetObj.GetType();
+                    } catch {
+                        return null;
+                    }
                 }
-                targetObj = field.GetValue(targetObj);
-                targetObjType = field.GetType();
+                // if normal field
+                else {
+                    var field = targetObjType.GetField(fieldName, Utils.ALL_INSTANCE_FIELDS);
+                    if (field == null) {
+                        return null;
+                    }
+                    targetObj = field.GetValue(targetObj);
+                    targetObjType = field.GetType();
+                }
             }
             return targetObj;
         }
@@ -151,7 +183,16 @@ namespace LobstersUnited.HumbleDI {
         public static object GetTargetObjectRelativeToIDeps(Object target, string iDepsPath) {
             return GetTargetObject(target, GetTargetObjectPath(iDepsPath));
         }
+        
+        public static IEnumerable<FieldInfo> GetCompatibleFields(Type type) {
+            return null;
+        }
+        
+        #endregion
 
+        // -------------------------------------- //
+        #region Private Methods
+        
         void InitData(int count) {
             fieldNames = new string[count];
             fieldTypes = new string[count];
@@ -185,8 +226,8 @@ namespace LobstersUnited.HumbleDI {
         }
         
         void Deserialize(object obj) {
-            var dict = obj.GetType()
-                .GetInterfaceFields().ToDictionary(f => f.Name);
+            Dictionary<string, FieldInfo> dict;
+            dict = obj.GetType().GetInterfaceFields().ToDictionary(f => f.Name);
             var count = fieldNames.Length;
 
             for (var i = 0; i < count; i++) {
@@ -195,7 +236,7 @@ namespace LobstersUnited.HumbleDI {
                     continue;
 
                 if (!ValidateType(validationLevel, field, fieldTypes[i])) {
-                    Debug.LogWarning($"Failed to validate interface field '{fieldNames[i]}' mapping in ${obj}");
+                    Debug.LogWarning($"Failed to validate interface field '{fieldNames[i]}' type in ${obj}");
                     continue;
                 }
                 
@@ -231,6 +272,6 @@ namespace LobstersUnited.HumbleDI {
             };
         }
         
-        
+        #endregion
     }
 }

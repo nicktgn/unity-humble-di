@@ -21,7 +21,6 @@
 // SOFTWARE.
 
 using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
@@ -30,6 +29,10 @@ namespace LobstersUnited.HumbleDI {
 
     internal static class Utils {
 
+        static readonly Type LIST_TYPE = typeof(List<>);
+        static readonly Type IENUMERABLE_TYPE = typeof(IEnumerable<>);
+
+        
         public static readonly BindingFlags ALL_INSTANCE_FIELDS = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
 
         // ------------------------------------- //
@@ -49,7 +52,15 @@ namespace LobstersUnited.HumbleDI {
             var fields = type.GetFields(ALL_INSTANCE_FIELDS);
             return fields.FirstOrDefault(field => field.FieldType == fieldType);
         }
-        
+
+        public static bool IsList(this Type type) {
+            return type.IsGenericType && type.GetGenericTypeDefinition() == LIST_TYPE;
+        }
+
+        public static bool IsIEnumerable(this Type type) {
+            return type.IsGenericType && type.GetGenericTypeDefinition() == IENUMERABLE_TYPE;
+        }
+
         public static string GetNameWithGenerics(this Type type) {
             var name = type.IsGenericType ? type.Name.Split('`')[0] : type.Name;
             if (type.IsGenericType) {
@@ -63,33 +74,8 @@ namespace LobstersUnited.HumbleDI {
             return type.GetCustomAttributes<ProviderAttribute>();
         }
 
-        public static FieldType GetFieldType(this Type type) {
-            if (type.IsArray) {
-                return FieldType.ARRAY;
-            }
-            if (typeof(List<>).IsAssignableFrom(type)) {
-                return FieldType.LIST;
-            }
-            if (typeof(IEnumerable).IsAssignableFrom(type)) {
-                return FieldType.UNSUPPORTED;
-            }
-            return FieldType.SINGULAR;
-        }
-        
         #endregion
         
-        public static Array CreateArray(Type t, int length = 0) {
-            if (length < 0)
-                throw new ArgumentOutOfRangeException(nameof(length));
-            return (Array) Activator.CreateInstance(t.MakeArrayType(), length);
-        }
-
-        public static System.Collections.IEnumerable CreateList(Type t, int length = 0) {
-            if (length < 0)
-                throw new ArgumentOutOfRangeException(nameof(length));
-            return (Array) Activator.CreateInstance(t, length);
-        }
-
         public static string MapToString<T>(this IEnumerable<T> list, Func<T, string> map, string separator = ", ") {
             return string.Join(separator, list.Select(map).ToArray());
         }

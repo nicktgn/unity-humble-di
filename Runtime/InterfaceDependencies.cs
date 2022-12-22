@@ -24,6 +24,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using JetBrains.Annotations;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
@@ -42,8 +43,55 @@ namespace LobstersUnited.HumbleDI {
     // }
 
     [Serializable]
+    internal struct IFaceFieldInfo {
+        // Name of the field inside the target object 
+        public string name;
+        // Assembly qualified name of the field type
+        public string type;
+        // Category of the field type
+        public IFaceFieldCategory category;
+        // lenght of the collection (if category is list or an array)
+        public int length;
+        
+        public IFaceFieldInfo(string name, string type, IFaceFieldCategory category, int length = 0) {
+            this.name = name;
+            this.type = type;
+            this.category = category;
+            this.length = length;
+        }
+
+        [CanBeNull]
+        public Type Type {
+            get {
+                try {
+                    return Type.GetType(type);
+                } catch {
+                    return null;
+                }
+            }
+        }
+
+        public bool IsArr => category == IFaceFieldCategory.ARRAY;
+        
+        public bool IsList => category == IFaceFieldCategory.LIST;
+        
+        public bool IsSingular => category == IFaceFieldCategory.SINGULAR;
+
+        public override string ToString() {
+            return $"IFaceFieldInfo {{ name={name}, category={category}, length={length}, type={type} }}";
+        }
+    }
+
+    [Serializable]
     public class InterfaceDependencies : ISerializationCallbackReceiver {
 
+        // static readonly Type ILIST_TYPE = typeof(IList<>);
+        // static readonly PropertyInfo COUNT_PROP = ILIST_TYPE.GetProperty("Count");
+        // static readonly PropertyInfo ITEM_PROP = ILIST_TYPE.GetProperty("Item");
+        static readonly string COUNT_PROP = "Count";
+        static readonly string ITEM_PROP = "Item";
+        static readonly string ADD_METHOD = "Add";
+        
         static readonly string ARRAY_DATA = "Array.data[";
         static readonly string BRACKET = "[";
         static readonly char BRACKET_CHAR = '[';
@@ -57,17 +105,16 @@ namespace LobstersUnited.HumbleDI {
         [SerializeField] Object target;
         // Nested path of the field that holds reference to the target object inside the Unity Object 
         [SerializeField] string targetPath;
-        // Names of the fields inside the target object 
-        [SerializeField] string[] fieldNames;
-        // Assembly qualified names of the types for each of the fields we want to serialize
-        [SerializeField] string[] fieldTypes;
-        // Mapped Unity Objects assigned to the fields
+        // Info about each field we want to serialize
+        [SerializeField] IFaceFieldInfo[] fieldInfos;
+        // Mapped Unity Objects assigned to the fields (or each element of each field if fields are collections)
         [SerializeField] Object[] mappedObjects;
-        // TODO:
+        
+        // TODO: do we need these?
         // Mapped paths to references of each field type inside each mapped Unity Object
-        [SerializeField] string[] mappedPaths;
+        // [SerializeField] string[] mappedPaths;
         // Sources of each mapped Unity Object (scene or assets)
-        [SerializeField] ReferenceSource[] mappedSources;
+        // [SerializeField] ReferenceSource[] mappedSources;
 
         /// <summary>
         /// Create new InterfaceDependencies object
@@ -96,7 +143,7 @@ namespace LobstersUnited.HumbleDI {
                 var targetObj = GetTargetObject(target, targetPath);
                 Serialize(targetObj);
             } catch {
-                // pass
+                // ignored
             }
         }
         
@@ -106,7 +153,7 @@ namespace LobstersUnited.HumbleDI {
                 var targetObj = GetTargetObject(target, targetPath);
                 Deserialize(targetObj);
             } catch {
-                // pass
+                // ignored
             }
         }
 
@@ -117,7 +164,7 @@ namespace LobstersUnited.HumbleDI {
         /// Determines the path to object containing InterfaceDependencies inside the target Unity Object
         /// </summary>
         /// <param name="iDepsPath">path of the InterfaceDependencies field</param>
-        public static string GetTargetObjectPath(string iDepsPath) {
+        internal static string GetTargetObjectPath(string iDepsPath) {
             if (string.IsNullOrEmpty(iDepsPath))
                 return null;
             var idx = iDepsPath.LastIndexOf('.');
@@ -133,7 +180,7 @@ namespace LobstersUnited.HumbleDI {
         /// <param name="target">Unity Object</param>
         /// <param name="targetPath">field path inside the Unity Object where actual target object is</param>
         /// <returns>object</returns>
-        public static object GetTargetObject(Object target, string targetPath) {
+        internal static object GetTargetObject(Object target, string targetPath) {
             // do this first to trigger null exception if target is null
             Type targetObjType;
             try {
@@ -180,12 +227,36 @@ namespace LobstersUnited.HumbleDI {
         /// <param name="target">Unity Object</param>
         /// <param name="targetPath">field path inside the Unity Object where actual target object is</param>
         /// <returns>object</returns>
-        public static object GetTargetObjectRelativeToIDeps(Object target, string iDepsPath) {
+        internal static object GetTargetObjectRelativeToIDeps(Object target, string iDepsPath) {
             return GetTargetObject(target, GetTargetObjectPath(iDepsPath));
         }
         
-        public static IEnumerable<FieldInfo> GetCompatibleFields(Type type) {
-            return null;
+        internal static IFaceFieldCategory GetIFaceFieldTypeCategory(Type type) {
+            if (type.IsArray && type.GetElementType()!.IsInterface) {
+                return IFaceFieldCategory.ARRAY;
+            }
+            if (type.IsList() && type.GetGenericArguments().FirstOrDefault()!.IsInterface) {
+                return IFaceFieldCategory.LIST;
+            }
+            // TODO: support for more collections or collection interfaces?
+            if (type.IsIEnumerable()) {
+                return IFaceFieldCategory.UNSUPPORTED;
+            }
+            if (type.IsInterface) {
+                return IFaceFieldCategory.SINGULAR;
+            }
+            return IFaceFieldCategory.UNSUPPORTED;
+        }
+        
+        internal static IEnumerable<FieldInfo> GetCompatibleFields(Type type) {
+            var fields = type.GetFields(Utils.ALL_INSTANCE_FIELDS);
+            foreach (var field in fields) {
+                var cat = GetIFaceFieldTypeCategory(field.FieldType);
+                if (cat == IFaceFieldCategory.UNSUPPORTED)
+                    continue;
+                
+                yield return field;
+            }
         }
         
         #endregion
@@ -193,64 +264,131 @@ namespace LobstersUnited.HumbleDI {
         // -------------------------------------- //
         #region Private Methods
         
-        void InitData(int count) {
-            fieldNames = new string[count];
-            fieldTypes = new string[count];
-            mappedObjects = new Object[count];
-            mappedSources = new ReferenceSource[count];
-        }
-
         void Serialize(object obj) {
-            var fieldsArr = obj.GetType().GetInterfaceFields().ToArray();
+            var fieldsArr = GetCompatibleFields(obj.GetType()).ToArray();
             var count = fieldsArr.Length;
             
-            InitData(count);
+            // init data
+            fieldInfos = new IFaceFieldInfo[count];
+            var mappedObjectList = new List<Object>();
+            
             for (var i = 0; i < count; i++) {
                 var field = fieldsArr[i];
-                fieldNames[i] = field.Name;
-                fieldTypes[i] = validationLevel > 0
-                    ? field.GetType().AssemblyQualifiedName
-                    : null;
-        
-                var unityObj = field.GetValue(obj) as Object;
-                mappedObjects[i] = unityObj;
-        
-                var source = ReferenceSource.NONE;
-                if (unityObj is ScriptableObject) {
-                    source = ReferenceSource.ASSET;
-                } else if (unityObj is Component) {
-                    source = ReferenceSource.SCENE;
+                var info = new IFaceFieldInfo();
+                info.name = field.Name;
+                info.type = field.FieldType.AssemblyQualifiedName;
+                var cat = info.category = GetIFaceFieldTypeCategory(field.FieldType);
+
+                var fieldVal = field.GetValue(obj);
+
+                // if field is array or collection
+                if (cat != IFaceFieldCategory.SINGULAR) {
+                    Array arr = null;
+                    PropertyInfo itemProp = null;
+                    if (cat == IFaceFieldCategory.ARRAY) {
+                        arr = fieldVal as Array;
+                        info.length = arr!.Length;
+                    }
+                    else if (cat == IFaceFieldCategory.LIST) {
+                        var countProp = field.FieldType.GetProperty(COUNT_PROP);
+                        info.length = (int) countProp!.GetValue(fieldVal);
+                        itemProp =  field.FieldType.GetProperty(ITEM_PROP);
+                    }
+
+                    for (var j = 0; j < info.length; j++) {
+                        indexArgs[0] = j;
+                        var item = cat == IFaceFieldCategory.ARRAY 
+                            ? arr!.GetValue(j)
+                            : itemProp!.GetValue(fieldVal, indexArgs);
+                        mappedObjectList.Add(item as Object);
+                    }
                 }
-                mappedSources[i] = source;
+                // if field is singular
+                else {
+                     mappedObjectList.Add(fieldVal as Object);  
+                }
+                
+                fieldInfos[i] = info;
+                
+                // var source = ReferenceSource.NONE;
+                // if (unityObj is ScriptableObject) {
+                //     source = ReferenceSource.ASSET;
+                // } else if (unityObj is Component) {
+                //     source = ReferenceSource.SCENE;
+                // }
+                // mappedSources[i] = source;
             }
+            
+            // convert mapped object list to array
+            mappedObjects = mappedObjectList.ToArray();
         }
+
+        object[] indexArgs = { 0 };
+        object[] valueArgs = { null };
         
         void Deserialize(object obj) {
             Dictionary<string, FieldInfo> dict;
-            dict = obj.GetType().GetInterfaceFields().ToDictionary(f => f.Name);
-            var count = fieldNames.Length;
+            dict = GetCompatibleFields(obj.GetType()).ToDictionary(f => f.Name);
+            var count = fieldInfos.Length;
 
+            var mappedIndex = 0;
             for (var i = 0; i < count; i++) {
-                var field = dict.GetValueOrDefault(fieldNames[i]);
+                var info = fieldInfos[i];
+                var field = dict.GetValueOrDefault(info.name);
                 if (field == null)
                     continue;
-
-                if (!ValidateType(validationLevel, field, fieldTypes[i])) {
-                    Debug.LogWarning($"Failed to validate interface field '{fieldNames[i]}' type in ${obj}");
+            
+                if (!ValidateType(validationLevel, field, info.type)) {
+                    Debug.LogWarning($"Failed to validate interface field '{info.name}' type in ${obj}");
                     continue;
                 }
-                
-                // Unity doesn't serialize nulls directly, so if serialized value a special "null" object,
-                //  catch the exception
-                try {
-                    field.SetValue(obj, mappedObjects[i]);
-                } 
-                #pragma warning disable CS0168
-                catch (ArgumentException e) {
-                    // pass
+
+                if (info.IsSingular) {
+                    SetSingularValue(field, obj, mappedObjects[mappedIndex]);
+                    mappedIndex++;
+                } else {
+                    var isArr = info.IsArr;
+                    var list = Activator.CreateInstance(field.FieldType, info.length);
+                    MethodInfo addMethod = isArr ? null : field.FieldType.GetMethod(ADD_METHOD);
+                    
+                    for (var j = 0; j < info.length; j++) {
+                        SetListItemValue(addMethod, list, isArr, mappedObjects[mappedIndex], j);
+                        mappedIndex++;
+                    }
+                    field.SetValue(obj, list);
                 }
-                #pragma warning restore CS0168
             }
+        }
+
+        void SetSingularValue(FieldInfo field, object obj, Object value) {
+            // Unity doesn't serialize nulls directly, so if serialized value a special "null" object,
+            //  catch the exception
+            try {
+                field.SetValue(obj, value);
+            } 
+            #pragma warning disable CS0168
+            catch (ArgumentException e) {
+                // ignored
+            }
+            #pragma warning restore CS0168
+        }
+
+        void SetListItemValue(MethodInfo addMethod, object list, bool isArr, Object value, int index) {
+            // Unity doesn't serialize nulls directly, so if serialized value a special "null" object,
+            //  catch the exception
+            try {
+                if (isArr) {
+                    (list as Array)!.SetValue(value, index);
+                } else {
+                    valueArgs[0] = value;
+                    addMethod.Invoke(list, valueArgs);
+                }
+            } 
+            #pragma warning disable CS0168
+            catch (ArgumentException e) {
+                // ignored
+            }
+            #pragma warning restore CS0168
         }
 
         /// <summary>

@@ -55,9 +55,21 @@ namespace LobstersUnited.HumbleDI.Tests {
                     this.inner = inner;
                 }
             }
+
+            static readonly string IFACE_ONE_TYPE_NAME = typeof(IFaceOne).AssemblyQualifiedName;
+            static readonly string IFACE_TWO_TYPE_NAME = typeof(IFaceTwo).AssemblyQualifiedName;
             
             static readonly FieldInfo innerField = typeof(MBWithLevelOneIFaceDeps).GetField("inner", Utils.ALL_INSTANCE_FIELDS);
 
+            static readonly Type idepsType = typeof(InterfaceDependencies);
+            static readonly FieldInfo targetField = idepsType.GetField("target", Utils.ALL_INSTANCE_FIELDS);
+            static readonly FieldInfo targetPathField = idepsType.GetField("targetPath", Utils.ALL_INSTANCE_FIELDS);
+            static readonly FieldInfo fieldInfosField = idepsType.GetField("fieldInfos", Utils.ALL_INSTANCE_FIELDS);
+            static readonly FieldInfo mappedObjectsField = idepsType.GetField("mappedObjects", Utils.ALL_INSTANCE_FIELDS);
+            // TODO:
+            //static readonly FieldInfo mappedPathsField = idepsType.GetField("mappedPaths", Utils.ALL_INSTANCE_FIELDS); 
+            //static readonly FieldInfo mappedSourcesField = idepsType.GetField("mappedSources", Utils.ALL_INSTANCE_FIELDS);
+            
             #endregion
         
         [Test]
@@ -196,21 +208,63 @@ namespace LobstersUnited.HumbleDI.Tests {
             }
         }
 
+        public class GetCompatibleFieldsTests {
+
+            class HasSomeIFaceFields {
+                IFaceOne privateField;
+                public IFaceTwo publicField;
+                protected IFaceOne protectedField;
+                public Transform nonIFaceField;
+            }
+
+            class HasArrayOfIFaceFields {
+                IFaceOne first;
+                IFaceTwo[] secondArr;
+                public Transform nonIFaceField;
+            }
+
+            class HasListOfIFaceFields {
+                IFaceOne first;
+                List<IFaceTwo> secondList;
+                IEnumerable<IFaceOne> firstEnumerable;
+            }
+
+            [Test]
+            public void should_get_all_iface_fields_including_non_public() {
+                var type = typeof(HasSomeIFaceFields);
+
+                var fields = InterfaceDependencies.GetCompatibleFields(type);
+
+                var fieldNames = fields.Select(f => f.Name);
+                Assert.That(fieldNames, Is.EqualTo(new [] { "privateField", "publicField", "protectedField" }));
+            }
+
+            [Test]
+            public void should_get_fields_that_are_arrays_of_iface_type() {
+                var type = typeof(HasArrayOfIFaceFields);
+
+                var fields = InterfaceDependencies.GetCompatibleFields(type);
+
+                var fieldNames = fields.Select(f => f.Name);
+                Assert.That(fieldNames, Is.EqualTo(new [] { "first", "secondArr" }));
+            }
+
+            [Test]
+            public void should_get_fields_that_are_lists_of_iface_type() {
+                var type = typeof(HasListOfIFaceFields);
+
+                var fields = InterfaceDependencies.GetCompatibleFields(type);
+                
+                var fieldNames = fields.Select(f => f.Name);
+                Assert.That(fieldNames, Is.EqualTo(new [] { "first", "secondList" }));
+            }
+
+        }
+
         public class SerializationTests {
             
             // ------------------------------------------ //
             #region SETUP
-            
-            class MBWithIFaceDepsCollections : MonoBehaviour {
-
-                [SerializeField] 
-                public List<Transform> firstList;
-
-                public void Construct(List<Transform> list) {
-                    firstList = list;
-                }
-            }
-
 
             static readonly Type mbWithDepsType = typeof(MBWithIFaceDeps);
             static readonly FieldInfo l0_iDepsField = mbWithDepsType.GetField("iDeps", Utils.ALL_INSTANCE_FIELDS);
@@ -221,29 +275,17 @@ namespace LobstersUnited.HumbleDI.Tests {
             static readonly FieldInfo l1_iDepsField = innerClassType.GetField("iDeps", Utils.ALL_INSTANCE_FIELDS);
             static readonly FieldInfo l1_firstField = innerClassType.GetField("first", Utils.ALL_INSTANCE_FIELDS);
             static readonly FieldInfo l1_secondField = innerClassType.GetField("second", Utils.ALL_INSTANCE_FIELDS);
-            
-            static readonly Type idepsType = typeof(InterfaceDependencies);
-            static readonly FieldInfo targetField = idepsType.GetField("target", Utils.ALL_INSTANCE_FIELDS);
-            static readonly FieldInfo targetPathField = idepsType.GetField("targetPath", Utils.ALL_INSTANCE_FIELDS);
-            static readonly FieldInfo fieldNamesField = idepsType.GetField("fieldNames", Utils.ALL_INSTANCE_FIELDS);
-            static readonly FieldInfo fieldTypesField = idepsType.GetField("fieldTypes", Utils.ALL_INSTANCE_FIELDS);
-            static readonly FieldInfo mappedObjectsField = idepsType.GetField("mappedObjects", Utils.ALL_INSTANCE_FIELDS);
-            // TODO:
-            //static readonly FieldInfo mappedPathsField = idepsType.GetField("mappedPaths", Utils.ALL_INSTANCE_FIELDS); 
-            static readonly FieldInfo mappedSourcesField = idepsType.GetField("mappedSources", Utils.ALL_INSTANCE_FIELDS);
 
             // Emulating what Unity would do when deserializing serializable datas
             static void SetSerializedData(object iDeps, Object target, string targetPath, Object[] mappedObjects, int validationLevel = 0) {
                 targetField.SetValue(iDeps, target);
                 targetPathField.SetValue(iDeps, targetPath);
-                fieldNamesField.SetValue(iDeps, new [] {"first", "second"});
-                if (validationLevel > 0) {
-                    fieldTypesField.SetValue(iDeps, new [] {typeof(IFaceOne).AssemblyQualifiedName, typeof(IFaceTwo).AssemblyQualifiedName});    
-                } else {
-                    fieldTypesField.SetValue(iDeps, new string[] {null, null});
-                }
+                
+                fieldInfosField.SetValue(iDeps, new [] {
+                    new IFaceFieldInfo("first", IFACE_ONE_TYPE_NAME, IFaceFieldCategory.SINGULAR),
+                    new IFaceFieldInfo("second", IFACE_TWO_TYPE_NAME, IFaceFieldCategory.SINGULAR)
+                });
                 mappedObjectsField.SetValue(iDeps, mappedObjects);
-                mappedSourcesField.SetValue(iDeps, new []{ ReferenceSource.ASSET, ReferenceSource.ASSET });
             }
             
             #endregion
@@ -256,12 +298,8 @@ namespace LobstersUnited.HumbleDI.Tests {
                 
                 Assert.That(targetField.GetValue(iDeps), Is.EqualTo(null));
                 Assert.That(targetPathField.GetValue(iDeps), Is.EqualTo(null));
-                Assert.That(fieldNamesField.GetValue(iDeps), Is.EqualTo(null));
-                Assert.That(fieldTypesField.GetValue(iDeps), Is.EqualTo(null));
+                Assert.That(fieldInfosField.GetValue(iDeps), Is.EqualTo(null));
                 Assert.That(mappedObjectsField.GetValue(iDeps), Is.EqualTo(null));
-                // TODO:
-                // Assert.That(mappedPathsField.GetValue(iDeps), Is.EqualTo(null));
-                Assert.That(mappedSourcesField.GetValue(iDeps), Is.EqualTo(null));
             }
 
             [Test]
@@ -313,10 +351,9 @@ namespace LobstersUnited.HumbleDI.Tests {
                 Assert.DoesNotThrow(() => iDeps.OnBeforeSerialize());
                 
                 Assert.That(targetField.GetValue(iDeps), Is.EqualTo(null));
-                Assert.That(fieldNamesField.GetValue(iDeps), Is.EqualTo(null));
-                Assert.That(fieldTypesField.GetValue(iDeps), Is.EqualTo(null));
+                Assert.That(targetPathField.GetValue(iDeps), Is.EqualTo(null));
+                Assert.That(fieldInfosField.GetValue(iDeps), Is.EqualTo(null));
                 Assert.That(mappedObjectsField.GetValue(iDeps), Is.EqualTo(null));
-                Assert.That(mappedSourcesField.GetValue(iDeps), Is.EqualTo(null));
             }
 
             [Test]
@@ -333,10 +370,11 @@ namespace LobstersUnited.HumbleDI.Tests {
 
                 Assert.That(targetField.GetValue(iDeps), Is.EqualTo(target));
                 Assert.That(targetPathField.GetValue(iDeps), Is.EqualTo(null));
-                Assert.That(fieldNamesField.GetValue(iDeps), Is.EqualTo(new [] { "first", "second" }));
-                Assert.That(fieldTypesField.GetValue(iDeps), Is.EqualTo(new string[] { null, null }));
+                Assert.That(fieldInfosField.GetValue(iDeps), Is.EqualTo(new [] {
+                    new IFaceFieldInfo("first", IFACE_ONE_TYPE_NAME, IFaceFieldCategory.SINGULAR),
+                    new IFaceFieldInfo("second", IFACE_TWO_TYPE_NAME, IFaceFieldCategory.SINGULAR),
+                }));
                 Assert.That(mappedObjectsField.GetValue(iDeps), Is.EqualTo(new Object[] { first, second }));
-                Assert.That(mappedSourcesField.GetValue(iDeps), Is.EqualTo(new [] { ReferenceSource.SCENE, ReferenceSource.ASSET }));
             }
 
             [Test]
@@ -354,10 +392,11 @@ namespace LobstersUnited.HumbleDI.Tests {
 
                 Assert.That(targetField.GetValue(iDeps), Is.EqualTo(target));
                 Assert.That(targetPathField.GetValue(iDeps), Is.EqualTo("inner"));
-                Assert.That(fieldNamesField.GetValue(iDeps), Is.EqualTo(new [] { "first", "second" }));
-                Assert.That(fieldTypesField.GetValue(iDeps), Is.EqualTo(new string[] { null, null }));
+                Assert.That(fieldInfosField.GetValue(iDeps), Is.EqualTo(new [] {
+                    new IFaceFieldInfo("first", IFACE_ONE_TYPE_NAME, IFaceFieldCategory.SINGULAR),
+                    new IFaceFieldInfo("second", IFACE_TWO_TYPE_NAME, IFaceFieldCategory.SINGULAR),
+                }));
                 Assert.That(mappedObjectsField.GetValue(iDeps), Is.EqualTo(new Object[] { first, second }));
-                Assert.That(mappedSourcesField.GetValue(iDeps), Is.EqualTo(new [] { ReferenceSource.SCENE, ReferenceSource.ASSET }));
             }
 
             [Test]
@@ -422,26 +461,209 @@ namespace LobstersUnited.HumbleDI.Tests {
 
         public class IFaceCollectionTests {
 
-            // [Test]
-            // public void should_test_iface_collections() {
-            //     var sampleEnumerableType = typeof(IEnumerable<>);
-            //     var sampleCollectionType = typeof(Collection<>);
-            //
-            //     var testType1 = typeof(IFaceOne[]);
-            //     var testType2 = typeof(List<IFaceOne>);
-            //     var testType3 = typeof(IEnumerable<IFaceOne>);
-            //     var testType4 = typeof(ICollection<IFaceOne>);
-            //     
-            //     // var enumerableType = typeof(IEnumerable<IFaceOne>);
-            //     // var fullEnumerableTypeName = enumerableType.AssemblyQualifiedName;
-            //     //
-            //     // var recreatedEnumerableType = Type.GetType(fullEnumerableTypeName);
-            //     //
-            //     // var obj = Activator.CreateInstance(recreatedEnumerableType);
-            //     
-            //     Debug.Log("Hello");
-            // }
+            class MBWithArrayOfIFaceField : MonoBehaviour {
+                
+                [SerializeField] InterfaceDependencies iDeps;
+                
+                public IFaceOne[] firstArr;
 
+                public IFaceTwo second;
+                
+                public void Construct(IFaceOne[] arr, IFaceTwo second) {
+                    firstArr = arr;
+                    this.second = second;
+                }
+            }
+            
+            class MBWithListOfIFaceField : MonoBehaviour {
+                
+                [SerializeField] InterfaceDependencies iDeps;
+                
+                public List<IFaceOne> firstList;
+
+                public IFaceTwo second;
+                
+                public void Construct(List<IFaceOne> list, IFaceTwo second) {
+                    firstList = list;
+                    this.second = second;
+                }
+            }
+
+            static readonly string IFACE_ONE_ARRAY_TYPE_NAME = typeof(IFaceOne[]).AssemblyQualifiedName;
+            static readonly string IFACE_ONE_LIST_TYPE_NAME = typeof(List<IFaceOne>).AssemblyQualifiedName;
+            
+            static readonly Type mbWithArraysType = typeof(MBWithArrayOfIFaceField);
+            static readonly FieldInfo iDepsField_Arrays = mbWithArraysType.GetField("iDeps", Utils.ALL_INSTANCE_FIELDS);
+            
+            static readonly Type mbWithListsType = typeof(MBWithListOfIFaceField);
+            static readonly FieldInfo iDepsField_Lists = mbWithListsType.GetField("iDeps", Utils.ALL_INSTANCE_FIELDS);
+            
+
+            class TestClass {
+                public IFaceOne[] arrField;
+                public List<IFaceOne> listField;
+
+                public TestClass() {
+                    arrField = new[] {
+                        A.Component<IFaceOneImplementation>(),
+                        A.Component<IFaceOneImplementation>(),
+                    };
+                    listField = new List<IFaceOne>();
+                    listField.Add(A.Component<IFaceOneImplementation>());
+                }
+            }
+            
+            // Emulating what Unity would do when deserializing serializable datas
+            static void SetSerializedDataWithArrays(object iDeps, Object target, string targetPath, Object[] mappedObjects) {
+                targetField.SetValue(iDeps, target);
+                targetPathField.SetValue(iDeps, targetPath);
+                
+                fieldInfosField.SetValue(iDeps, new [] {
+                    new IFaceFieldInfo("firstArr", IFACE_ONE_ARRAY_TYPE_NAME, IFaceFieldCategory.ARRAY, 2),
+                    new IFaceFieldInfo("second", IFACE_TWO_TYPE_NAME, IFaceFieldCategory.SINGULAR),
+                });
+                mappedObjectsField.SetValue(iDeps, mappedObjects);
+            }
+            
+            static void SetSerializedDataWithLists(object iDeps, Object target, string targetPath, Object[] mappedObjects) {
+                targetField.SetValue(iDeps, target);
+                targetPathField.SetValue(iDeps, targetPath);
+                
+                fieldInfosField.SetValue(iDeps, new [] {
+                    new IFaceFieldInfo("firstList", IFACE_ONE_LIST_TYPE_NAME, IFaceFieldCategory.LIST, 2),
+                    new IFaceFieldInfo("second", IFACE_TWO_TYPE_NAME, IFaceFieldCategory.SINGULAR),
+                });
+                mappedObjectsField.SetValue(iDeps, mappedObjects);
+            }
+
+            [Test]
+            public void test() {
+                var obj = new TestClass();
+                var type = typeof(TestClass);
+                var arrFieldField = type.GetField("arrField", Utils.ALL_INSTANCE_FIELDS);
+                var listFieldField = type.GetField("listField", Utils.ALL_INSTANCE_FIELDS);
+
+                var arrHash1 = obj.arrField[0].GetHashCode();
+                var arrHash2 = obj.arrField[1].GetHashCode();
+                var arr = arrFieldField.GetValue(obj) as Array;
+                var count = arr.Length;
+                arr.SetValue(A.Component<IFaceOneImplementation>(), 1); 
+                var newArrHash2 = obj.arrField[1].GetHashCode();
+
+                var arrItemProp = arrFieldField.FieldType.GetProperty("Item");
+
+                var listHash1 = obj.listField[0].GetHashCode();
+                var list = listFieldField.GetValue(obj);
+                var countProp = list.GetType().GetProperty("Count");
+                count = (int) countProp.GetValue(list);
+                var itemProp = list.GetType().GetProperty("Item");
+                itemProp.SetValue(list, A.Component<IFaceOneImplementation>(), new object[] { 0 });
+                var newListHash1 = obj.listField[0].GetHashCode();
+
+                var arrType = typeof(IFaceOne[]);
+                var newArr = (Array) Activator.CreateInstance(arrType, 3);
+
+                var listType = typeof(List<IFaceOne>);
+                var newList = Activator.CreateInstance(listType, 2);  
+                
+                Debug.Log(arr);
+            }
+
+            [Test]
+            public void should_serialize_iface_arrays() {
+                var target = A.Component<MBWithArrayOfIFaceField>();
+                var arrItem0 = A.Component<IFaceOneImplementation>();
+                var arrItem1 = A.Component<IFaceOneImplementation>();
+                var arr = new IFaceOne[] { arrItem0, arrItem1 };
+                var second = A.SO<IFaceTwoImplementation>();
+                target.Construct(arr, second);
+                // inject and initialize interface dependencies object (normally done by the drawer)
+                var iDeps = new InterfaceDependencies(target, "iDeps");
+                iDepsField_Arrays.SetValue(target, iDeps);
+                
+                iDeps.OnBeforeSerialize();
+                
+                Assert.That(targetField.GetValue(iDeps), Is.EqualTo(target));
+                Assert.That(targetPathField.GetValue(iDeps), Is.EqualTo(null));
+                Assert.That(fieldInfosField.GetValue(iDeps), Is.EqualTo(new [] {
+                    new IFaceFieldInfo("firstArr", IFACE_ONE_ARRAY_TYPE_NAME, IFaceFieldCategory.ARRAY, 2),
+                    new IFaceFieldInfo("second", IFACE_TWO_TYPE_NAME, IFaceFieldCategory.SINGULAR),
+                }));
+                Assert.That(mappedObjectsField.GetValue(iDeps), Is.EqualTo(new Object[] {
+                    arrItem0,
+                    arrItem1,
+                    second
+                }));
+            }
+            
+            [Test]
+            public void should_serialize_iface_lists() {
+                var target = A.Component<MBWithListOfIFaceField>();
+                var listItem0 = A.Component<IFaceOneImplementation>();
+                var listItem1 = A.Component<IFaceOneImplementation>();
+                var list = new List<IFaceOne> { listItem0, listItem1 };
+                var second = A.SO<IFaceTwoImplementation>();
+                target.Construct(list, second);
+                // inject and initialize interface dependencies object (normally done by the drawer)
+                var iDeps = new InterfaceDependencies(target, "iDeps");
+                iDepsField_Lists.SetValue(target, iDeps);
+                
+                iDeps.OnBeforeSerialize();
+                
+                Assert.That(targetField.GetValue(iDeps), Is.EqualTo(target));
+                Assert.That(targetPathField.GetValue(iDeps), Is.EqualTo(null));
+                Assert.That(fieldInfosField.GetValue(iDeps), Is.EqualTo(new [] {
+                    new IFaceFieldInfo("firstList", IFACE_ONE_LIST_TYPE_NAME, IFaceFieldCategory.LIST, 2),
+                    new IFaceFieldInfo("second", IFACE_TWO_TYPE_NAME, IFaceFieldCategory.SINGULAR),
+                }));
+                Assert.That(mappedObjectsField.GetValue(iDeps), Is.EqualTo(new Object[] {
+                    listItem0,
+                    listItem1,
+                    second
+                }));
+            }
+            
+            [Test]
+            public void should_deserialize_iface_arrays() {
+                var target = A.Component<MBWithArrayOfIFaceField>();
+                var mappedObjects = new Object[] {
+                    A.Component<IFaceOneImplementation>(),
+                    A.Component<IFaceOneImplementation>(),
+                    A.SO<IFaceTwoImplementation>()
+                };
+                // inject and initialize interface dependencies object (normally done by the drawer)
+                var iDeps = new InterfaceDependencies(null);
+                SetSerializedDataWithArrays(iDeps, target, null, mappedObjects);
+                iDepsField_Arrays.SetValue(target, iDeps);
+                
+                iDeps.OnAfterDeserialize();
+                
+                Assert.That(target.firstArr.Length, Is.EqualTo(2));
+                Assert.That(target.firstArr[0], Is.EqualTo(mappedObjects[0]));
+                Assert.That(target.firstArr[1], Is.EqualTo(mappedObjects[1]));
+                Assert.That(target.second, Is.EqualTo(mappedObjects[2]));
+            }
+            
+            [Test]
+            public void should_deserialize_iface_lists() {
+                var target = A.Component<MBWithListOfIFaceField>();
+                var mappedObjects = new Object[] {
+                    A.Component<IFaceOneImplementation>(),
+                    A.Component<IFaceOneImplementation>(),
+                    A.SO<IFaceTwoImplementation>()
+                };
+                // inject and initialize interface dependencies object (normally done by the drawer)
+                var iDeps = new InterfaceDependencies(null);
+                SetSerializedDataWithLists(iDeps, target, null, mappedObjects);
+                iDepsField_Lists.SetValue(target, iDeps);
+                
+                iDeps.OnAfterDeserialize();
+                
+                Assert.That(target.firstList.Count, Is.EqualTo(2));
+                Assert.That(target.firstList[0], Is.EqualTo(mappedObjects[0]));
+                Assert.That(target.firstList[1], Is.EqualTo(mappedObjects[1]));
+                Assert.That(target.second, Is.EqualTo(mappedObjects[2]));
+            }
         }
     }
 }

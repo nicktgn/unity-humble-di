@@ -22,7 +22,7 @@
 
 namespace LobstersUnited.HumbleDI {
     
-    internal enum FieldType {
+    internal enum IFaceFieldCategory {
         UNSUPPORTED,
         SINGULAR,
         ARRAY,

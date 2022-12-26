@@ -24,6 +24,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using UnityEngine;
+using Object = System.Object;
 
 namespace LobstersUnited.HumbleDI {
 
@@ -76,8 +78,34 @@ namespace LobstersUnited.HumbleDI {
 
         #endregion
         
+        
         public static string MapToString<T>(this IEnumerable<T> list, Func<T, string> map, string separator = ", ") {
             return string.Join(separator, list.Select(map).ToArray());
         }
+        
+        // ------------------------------------- //
+        #region Unity Object Utils
+
+        public static UnityEngine.Object FindComponentOrSO(Type matchingType, UnityEngine.Object obj) {
+            var gameObject = obj as GameObject;
+            if (gameObject) {
+                var cmp = gameObject.GetComponents<Component>().Where(c => {
+                    // TODO: consider using field.FieldType.IsAssignableFrom(c.GetType())
+                    var iList = c.GetType().GetInterfaces();
+                    return iList.Any(i => i == matchingType);
+                }).FirstOrDefault();
+                return cmp;
+            }
+            
+            var so = obj as ScriptableObject;
+            if (so) {
+                // TODO: consider using field.FieldType.IsAssignableFrom(so.GetType())
+                var hasRequiredIFace = so.GetType().GetInterfaces().Any(i => i == matchingType);
+                if (hasRequiredIFace) return so;
+            }
+            return null;
+        }
+
+        #endregion
     }
 }

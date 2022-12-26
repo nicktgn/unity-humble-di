@@ -24,23 +24,14 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
 using JetBrains.Annotations;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
 
 namespace LobstersUnited.HumbleDI {
-
-    // internal class TargetNullException : Exception { }
-    //
-    // internal class ValidationFailedException : Exception {
-    //     object target;
-    //     string fieldName;
-    //
-    //     public ValidationFailedException(string fieldName, object target) {
-    //         
-    //     }
-    // }
+    
 
     [Serializable]
     internal struct IFaceFieldInfo {
@@ -52,12 +43,15 @@ namespace LobstersUnited.HumbleDI {
         public IFaceFieldCategory category;
         // lenght of the collection (if category is list or an array)
         public int length;
+        // if it is an array or list type specifies if it should be initialized (even if length is 0)
+        public bool isInit;
         
-        public IFaceFieldInfo(string name, string type, IFaceFieldCategory category, int length = 0) {
+        public IFaceFieldInfo(string name, string type, IFaceFieldCategory category, int length, bool isInit) {
             this.name = name;
             this.type = type;
             this.category = category;
             this.length = length;
+            this.isInit = isInit;
         }
 
         [CanBeNull]
@@ -71,30 +65,21 @@ namespace LobstersUnited.HumbleDI {
             }
         }
 
-        public bool IsArr => category == IFaceFieldCategory.ARRAY;
-        
-        public bool IsList => category == IFaceFieldCategory.LIST;
-        
         public bool IsSingular => category == IFaceFieldCategory.SINGULAR;
 
         public override string ToString() {
-            return $"IFaceFieldInfo {{ name={name}, category={category}, length={length}, type={type} }}";
+            return $"IFaceFieldInfo {{ name={name}, category={category}, length={length}, isInit={isInit} type={type} }}";
         }
     }
 
     [Serializable]
     public class InterfaceDependencies : ISerializationCallbackReceiver {
-
-        // static readonly Type ILIST_TYPE = typeof(IList<>);
-        // static readonly PropertyInfo COUNT_PROP = ILIST_TYPE.GetProperty("Count");
-        // static readonly PropertyInfo ITEM_PROP = ILIST_TYPE.GetProperty("Item");
-        static readonly string COUNT_PROP = "Count";
-        static readonly string ITEM_PROP = "Item";
-        static readonly string ADD_METHOD = "Add";
         
         static readonly string ARRAY_DATA = "Array.data[";
         static readonly string BRACKET = "[";
         static readonly char BRACKET_CHAR = '[';
+        
+        [NonSerialized] object serializeLock = new object();
         
         // drawer support
         public bool isFoldout = true;
@@ -123,6 +108,7 @@ namespace LobstersUnited.HumbleDI {
         /// <param name="iDepsPath">path of the InterfaceDependencies field (incl. field's name) inside the target Unity Object</param>
         /// <param name="validationLevel">level of validation to be performed for each mapped field on deserialization</param>
         public InterfaceDependencies(Object target, string iDepsPath = "", int validationLevel = 0) {
+            Debug.Log("Is this ever called?");
             SetTarget(target, iDepsPath);
             this.validationLevel = validationLevel;
         }
@@ -138,28 +124,43 @@ namespace LobstersUnited.HumbleDI {
         }
 
         public void OnBeforeSerialize() {
+            EnsureLockExists();
             // This might be running not on the main thread, need to avoid `== null` comparisons
+            // Debug.Log($"{target} serialize: ");
             try {
-                var targetObj = GetTargetObject(target, targetPath);
-                Serialize(targetObj);
-            } catch {
+                lock (serializeLock) {
+                    var targetObj = GetTargetObject(target, targetPath);
+                    Serialize(targetObj);    
+                }
+            } catch (Exception e) {
+                Debug.Log($"Serialize fail: {e}");
                 // ignored
             }
         }
         
         public void OnAfterDeserialize() {
+            EnsureLockExists();
             // This might be running not on the main thread, need to avoid `== null` comparisons
             try {
-                var targetObj = GetTargetObject(target, targetPath);
-                Deserialize(targetObj);
-            } catch {
+                lock (serializeLock) {
+                    var targetObj = GetTargetObject(target, targetPath);
+                    Deserialize(targetObj);
+                }
+            } catch (Exception e) {
+                Debug.Log($"Deserialize fail: {e}");
                 // ignored
             }
         }
 
         // -------------------------------------- //
         #region Static Methods
-        
+
+        void EnsureLockExists() {
+            if (serializeLock == null) {
+                serializeLock = new object();
+            }
+        }
+
         /// <summary>
         /// Determines the path to object containing InterfaceDependencies inside the target Unity Object
         /// </summary>
@@ -267,7 +268,7 @@ namespace LobstersUnited.HumbleDI {
         void Serialize(object obj) {
             var fieldsArr = GetCompatibleFields(obj.GetType()).ToArray();
             var count = fieldsArr.Length;
-            
+
             // init data
             fieldInfos = new IFaceFieldInfo[count];
             var mappedObjectList = new List<Object>();
@@ -281,27 +282,12 @@ namespace LobstersUnited.HumbleDI {
 
                 var fieldVal = field.GetValue(obj);
 
-                // if field is array or collection
-                if (cat != IFaceFieldCategory.SINGULAR) {
-                    Array arr = null;
-                    PropertyInfo itemProp = null;
-                    if (cat == IFaceFieldCategory.ARRAY) {
-                        arr = fieldVal as Array;
-                        info.length = arr!.Length;
-                    }
-                    else if (cat == IFaceFieldCategory.LIST) {
-                        var countProp = field.FieldType.GetProperty(COUNT_PROP);
-                        info.length = (int) countProp!.GetValue(fieldVal);
-                        itemProp =  field.FieldType.GetProperty(ITEM_PROP);
-                    }
-
-                    for (var j = 0; j < info.length; j++) {
-                        indexArgs[0] = j;
-                        var item = cat == IFaceFieldCategory.ARRAY 
-                            ? arr!.GetValue(j)
-                            : itemProp!.GetValue(fieldVal, indexArgs);
-                        mappedObjectList.Add(item as Object);
-                    }
+                // if field is array or list
+                if (cat is IFaceFieldCategory.ARRAY or IFaceFieldCategory.LIST) {
+                    var list = new CollectionWrapper(field, obj);
+                    info.length = list.Count;
+                    info.isInit = list.Object != null;
+                    mappedObjectList.AddRange(list.Select(item => item as Object));
                 }
                 // if field is singular
                 else {
@@ -309,26 +295,19 @@ namespace LobstersUnited.HumbleDI {
                 }
                 
                 fieldInfos[i] = info;
-                
-                // var source = ReferenceSource.NONE;
-                // if (unityObj is ScriptableObject) {
-                //     source = ReferenceSource.ASSET;
-                // } else if (unityObj is Component) {
-                //     source = ReferenceSource.SCENE;
-                // }
-                // mappedSources[i] = source;
             }
             
             // convert mapped object list to array
             mappedObjects = mappedObjectList.ToArray();
         }
-
-        object[] indexArgs = { 0 };
-        object[] valueArgs = { null };
         
         void Deserialize(object obj) {
             Dictionary<string, FieldInfo> dict;
             dict = GetCompatibleFields(obj.GetType()).ToDictionary(f => f.Name);
+            if (fieldInfos == null) {
+                Debug.Log("Why would this be null????");
+                Debug.Log(Thread.CurrentThread.ManagedThreadId);
+            }
             var count = fieldInfos.Length;
 
             var mappedIndex = 0;
@@ -347,15 +326,18 @@ namespace LobstersUnited.HumbleDI {
                     SetSingularValue(field, obj, mappedObjects[mappedIndex]);
                     mappedIndex++;
                 } else {
-                    var isArr = info.IsArr;
-                    var list = Activator.CreateInstance(field.FieldType, info.length);
-                    MethodInfo addMethod = isArr ? null : field.FieldType.GetMethod(ADD_METHOD);
+                    // assign null if not supposed to be initialized
+                    if (!info.isInit) {
+                        SetSingularValue(field, obj, null);
+                        continue;
+                    }
                     
+                    var list = new CollectionWrapper(field, obj);
+                    list.Create(info.length);
                     for (var j = 0; j < info.length; j++) {
-                        SetListItemValue(addMethod, list, isArr, mappedObjects[mappedIndex], j);
+                        SetListItemValue(list, mappedObjects[mappedIndex], j);
                         mappedIndex++;
                     }
-                    field.SetValue(obj, list);
                 }
             }
         }
@@ -365,30 +347,46 @@ namespace LobstersUnited.HumbleDI {
             //  catch the exception
             try {
                 field.SetValue(obj, value);
+                return;
             } 
             #pragma warning disable CS0168
             catch (ArgumentException e) {
                 // ignored
             }
             #pragma warning restore CS0168
+            
+            // retry with null
+            field.SetValue(obj, null);
         }
 
-        void SetListItemValue(MethodInfo addMethod, object list, bool isArr, Object value, int index) {
+        void SetListItemValue(CollectionWrapper list, Object value, int index) {
             // Unity doesn't serialize nulls directly, so if serialized value a special "null" object,
             //  catch the exception
             try {
-                if (isArr) {
-                    (list as Array)!.SetValue(value, index);
-                } else {
-                    valueArgs[0] = value;
-                    addMethod.Invoke(list, valueArgs);
+                if (list.IsArray) {
+                    list[index] = value;
                 }
-            } 
+                else {
+                    list.Add(value);
+                }
+                return;
+            }
             #pragma warning disable CS0168
             catch (ArgumentException e) {
-                // ignored
+                // can be thrown when calling list.Add
+            } catch (InvalidCastException e) {
+                // can be thrown when assigning to array item
+            } catch (UnityException e) {
+                // can be thrown when calling list.Add
             }
             #pragma warning restore CS0168
+
+            // retry with null
+            if (list.IsArray) {
+                list[index] = null;
+            } else {
+                list.Add(null);
+            }
         }
 
         /// <summary>

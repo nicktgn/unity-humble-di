@@ -21,15 +21,12 @@
 // SOFTWARE.
 
 using System;
-using System.IO;
 using System.Linq;
-using System.Collections.Generic;
-using System.Reflection;
-using System.Text;
 
 namespace LobstersUnited.HumbleDI {
     
-    public class ProviderAttribute : Attribute {
+    // hide this for now
+    internal class ProviderAttribute : Attribute {
 
         public string path = null;
 

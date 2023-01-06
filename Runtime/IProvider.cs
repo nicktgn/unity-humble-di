@@ -20,8 +20,6 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-using System.Collections;
-
 namespace LobstersUnited.HumbleDI {
     
     public interface IProvider<out T> where T : class {

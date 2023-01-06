@@ -23,9 +23,9 @@ OR
 
 ## Features
 
-#### Serializable interface fields
+### Serializable interface fields
 Saves the assigned references to `MonoBehaviours` or `ScriptableObjects` that implement 
-specified interfaces.
+specified interfaces. **Lists and Arrays of interface types also supported**
 
 ```csharp
 public interface IFace {
@@ -44,6 +44,10 @@ public class MyMonoBehaviour : MonoBehaviour {
     [SerializeField] InterfaceDependencies iDeps;
 
     IFace myDependency;
+    
+    List<IFace> listOfDependencies;
+    
+    Iface[] arrayOfDependencies;
 
     void Start() {
         myDependency.UseIt();
@@ -51,7 +55,7 @@ public class MyMonoBehaviour : MonoBehaviour {
 }
 ```
 
-#### Custom inspector with custom object picker
+### Custom inspector with custom object picker
 
 Adding `InterfaceDependecies` field to your `MonoBehaviour` or `ScriptableObject` is the only 
 thing that is required to enable custom serialization of interface fields and expose them
@@ -72,8 +76,3 @@ field will highlight the object in Project or Scene view (depending on where it 
 
 ~TODO~
 
-## TODO:
-
-- [ ] Support for serializing fields that are of type collection of interface types (array, list, IEnumerable?)
-    - [ ] Adapt drawer to display custom list field
-- [ ] ProviderAttribute for using POCO objects that implement interfaces as references 

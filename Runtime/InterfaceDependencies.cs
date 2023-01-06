@@ -302,6 +302,7 @@ namespace LobstersUnited.HumbleDI {
         }
         
         void Deserialize(object obj) {
+            Debug.Log("Deserializing...");
             Dictionary<string, FieldInfo> dict;
             dict = GetCompatibleFields(obj.GetType()).ToDictionary(f => f.Name);
             if (fieldInfos == null) {

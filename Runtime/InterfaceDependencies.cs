@@ -82,8 +82,13 @@ namespace LobstersUnited.HumbleDI {
         [NonSerialized] object serializeLock = new object();
         
         // drawer support
-        public bool isFoldout = true;
-        
+        [SerializeField] bool foldoutState = true;
+
+        Dictionary<int, bool> listFieldsFoldoutState;
+
+        [SerializeField] int[] listFieldsFoldoutStateKeys;
+        [SerializeField] bool[] listFieldsFoldoutStateValues;
+
         public int validationLevel;
         
         // Unity Object that contains the target object interface fields of which we want to serialize/deserialize 
@@ -95,7 +100,7 @@ namespace LobstersUnited.HumbleDI {
         // Mapped Unity Objects assigned to the fields (or each element of each field if fields are collections)
         [SerializeField] Object[] mappedObjects;
         
-        // TODO: do we need these?
+        // TODO: are these still needed?
         // Mapped paths to references of each field type inside each mapped Unity Object
         // [SerializeField] string[] mappedPaths;
         // Sources of each mapped Unity Object (scene or assets)
@@ -121,6 +126,25 @@ namespace LobstersUnited.HumbleDI {
         internal void SetTarget(Object target, string iDepsPath) {
             this.target = target;
             targetPath = GetTargetObjectPath(iDepsPath);
+        }
+        
+        internal bool IsFoldout {
+            get => foldoutState;
+            set => foldoutState = value;
+        }
+
+        internal bool IsListFoldout(int fieldIndex) {
+            if (listFieldsFoldoutState == null) {
+                listFieldsFoldoutState = new Dictionary<int, bool>();
+            }
+            return listFieldsFoldoutState.GetValueOrDefault(fieldIndex);
+        }
+
+        internal void SetListFoldout(int fieldIndex, bool isFoldout) {
+            if (listFieldsFoldoutState == null) {
+                listFieldsFoldoutState = new Dictionary<int, bool>();
+            }
+            listFieldsFoldoutState[fieldIndex] = isFoldout;
         }
 
         public void OnBeforeSerialize() {
@@ -263,7 +287,7 @@ namespace LobstersUnited.HumbleDI {
         #endregion
 
         // -------------------------------------- //
-        #region Private Methods
+        #region Interface Fields Serialiaztion 
         
         void Serialize(object obj) {
             var fieldsArr = GetCompatibleFields(obj.GetType()).ToArray();
@@ -409,6 +433,32 @@ namespace LobstersUnited.HumbleDI {
             };
         }
         
+        #endregion
+        
+        // -------------------------------------- //
+        #region Foldout State Serialization
+
+        void SerializeFoldout() {
+            var length = listFieldsFoldoutState.Count;
+            listFieldsFoldoutStateKeys = new int[length];
+            listFieldsFoldoutStateValues = new bool[length];
+            var i = 0;
+            foreach (var kv in listFieldsFoldoutState) {
+                listFieldsFoldoutStateKeys[i] = kv.Key;
+                listFieldsFoldoutStateValues[i] = kv.Value;
+                i++;
+            }
+        }
+
+        void DeserializeFoldout() {
+            listFieldsFoldoutState = new Dictionary<int, bool>();
+            if (listFieldsFoldoutStateKeys == null)
+                return;
+            for (var i = 0; i < listFieldsFoldoutStateKeys.Length; i++) {
+                listFieldsFoldoutState.Add(listFieldsFoldoutStateKeys[i], listFieldsFoldoutStateValues[i]);
+            }
+        }
+
         #endregion
     }
 }

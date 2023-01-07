@@ -30,7 +30,6 @@ using Object = UnityEngine.Object;
 
 namespace LobstersUnited.HumbleDI.Editor {
 
-
     [CustomPropertyDrawer(typeof(InterfaceDependencies))]
     internal class InterfaceDependenciesDrawer : PropertyDrawer, IDisposable {
 
@@ -47,9 +46,7 @@ namespace LobstersUnited.HumbleDI.Editor {
         SerializedProperty isFoldout;
         static readonly string isFoldoutPropName = "isFoldout";
         InterfaceDependencies iDeps;
-
-        Dictionary<int, bool> isListFieldFoldout = new Dictionary<int, bool>();
-
+        
         // Draw the property inside the given rect
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label) {
             isFoldout = property.FindPropertyRelative(isFoldoutPropName);
@@ -82,7 +79,7 @@ namespace LobstersUnited.HumbleDI.Editor {
             foreach (var kv in listManagers) {
                 // foldout header for each list field
                 listFieldsHeight += lineWithSpacing;
-                if (isListFieldFoldout.GetValueOrDefault(kv.Key)) {
+                if (iDeps.IsListFoldout(kv.Key)) {
                     listFieldsHeight += kv.Value.GetHeight();
                     // listFieldsHeight += verticalSpacing;
                 }
@@ -95,7 +92,7 @@ namespace LobstersUnited.HumbleDI.Editor {
             
             pos.y += DrawerUtils.verticalSpacing;
 
-            var foldout = isFoldout.boolValue;
+            var foldout = iDeps.IsFoldout;
             
             // draw box background
             var sectionHeight = CalculateDependencySectionHeight();
@@ -121,11 +118,19 @@ namespace LobstersUnited.HumbleDI.Editor {
         }
 
         void SaveFoldoutState(bool foldout) {
-            if (foldout == iDeps.isFoldout)
+            if (foldout == iDeps.IsFoldout)
                 return;
             // TODO: consider if this is necessary
             // EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
-            iDeps.isFoldout = foldout;
+            iDeps.IsFoldout = foldout;
+        }
+
+        void SaveListFoldoutState(int fieldIndex, bool foldout) {
+            if (foldout == iDeps.IsListFoldout(fieldIndex))
+                return;
+            // TODO: consider if this is necessary
+            // EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
+            iDeps.SetListFoldout(fieldIndex, foldout);
         }
 
         float DrawSeparatorLine(Rect line) {
@@ -172,7 +177,7 @@ namespace LobstersUnited.HumbleDI.Editor {
                 return 0;
             }
 
-            var listFoldout = isListFieldFoldout.GetValueOrDefault(index);
+            var listFoldout = iDeps.IsListFoldout(index);
 
             // draw foldout header - labeled with field name
             var label = ObjectNames.NicifyVariableName(listField.Name);
@@ -198,7 +203,7 @@ namespace LobstersUnited.HumbleDI.Editor {
                 
                 EditorGUI.indentLevel--;
             }
-            isListFieldFoldout[index] = listFoldout;
+            iDeps.SetListFoldout(index, listFoldout);
 
             return pos.y - startY;
         }
@@ -296,6 +301,8 @@ namespace LobstersUnited.HumbleDI.Editor {
                 mgr.Dispose();
             }
             listManagers.Clear();
+
+            iDeps = null;
         }
         
 

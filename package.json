@@ -17,5 +17,17 @@
         "name": "Lobsters United",
         "email": "nicktgn@gmail.com",
         "url": "https://github.com/nicktgn"
-    }
+    },
+    "samples": [
+        {
+            "displayName": "HumbleDI - Simple",
+            "description": "Contains sample project with Unity object as direct dependencies",
+            "path": "Samples~/HumbleDI - Simple"
+        },
+        {
+            "displayName": "HumbleDI - With Providers",
+            "description": "Contains sample project using IProvider interface used to get to the POCO dependencies",
+            "path": "Samples~/HumbleDI - With Providers"
+        }
+    ]
 }

@@ -21,9 +21,12 @@
 // SOFTWARE.
 
 using System;
+using System.Collections.Generic;
 using System.Reflection;
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using Object = UnityEngine.Object;
 
 
@@ -42,11 +45,28 @@ namespace LobstersUnited.HumbleDI.Editor {
         /// </summary>
         public object actualTarget;
 
+        /// <summary>
+        /// Caching the assigned values of the interface fields to avoid serialization / deserialization timing bugs
+        /// </summary>
+        Dictionary<FieldInfo, Object> fieldCache;
+
         public ObjectManager(Object target, string iDepsFieldPath) {
             this.target = target;
             actualTarget = InterfaceDependencies.GetTargetObjectRelativeToIDeps(target, iDepsFieldPath);
+
+            fieldCache = new Dictionary<FieldInfo, Object>();
         }
-        
+
+        ~ObjectManager() {
+            Cleanup();
+        }
+
+        public void Cleanup() {
+            target = null;
+            actualTarget = null;
+            fieldCache.Clear();
+        }
+
         public InterfaceDependencies BindInterfaceDependencies(FieldInfo iDepsField, string iDepsFieldPath) {
             var obj = iDepsField.GetValue(actualTarget);
             switch (obj) {
@@ -80,10 +100,19 @@ namespace LobstersUnited.HumbleDI.Editor {
         public void SetObjectToField(FieldInfo field, Object pickedObj) {
             RecordUndo();
             field.SetValue(actualTarget, pickedObj);
+            
+            fieldCache[field] = pickedObj;
+            
+            EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
         }
 
         public Object GetMappedObjectForField(FieldInfo field) {
-            return field.GetValue(actualTarget) as Object;
+            var obj = fieldCache.GetValueOrDefault(field);
+            if (obj == null) {
+                obj = field.GetValue(actualTarget) as Object;
+                fieldCache[field] = obj;
+            }
+            return obj;
         }
         
         public GUIContent GetContentFromObject(Object obj, Type type) {

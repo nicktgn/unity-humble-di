@@ -41,7 +41,7 @@ namespace LobstersUnited.HumbleDI.Editor {
         List<IFaceFieldCategory> iFaceFieldCategories;
 
         ObjectManager objectManager;
-        Dictionary<int, ListFieldDrawer> listManagers = new Dictionary<int, ListFieldDrawer>();
+        Dictionary<int, ListFieldDrawer> listDrawers = new Dictionary<int, ListFieldDrawer>();
 
         SerializedProperty isFoldout;
         static readonly string isFoldoutPropName = "isFoldout";
@@ -73,10 +73,10 @@ namespace LobstersUnited.HumbleDI.Editor {
             var verticalSpacing = DrawerUtils.verticalSpacing;
             var lineWithSpacing = lineHeight + verticalSpacing;
             var headerHeight = lineHeight + verticalSpacing * 2 + 2;
-            var singularFieldsHeight = (iFaceFields.Count - listManagers.Count) * lineWithSpacing;
+            var singularFieldsHeight = (iFaceFields.Count - listDrawers.Count) * lineWithSpacing;
             var listFieldsHeight = 0.0f;
             
-            foreach (var kv in listManagers) {
+            foreach (var kv in listDrawers) {
                 // foldout header for each list field
                 listFieldsHeight += lineWithSpacing;
                 if (iDeps.IsListFoldout(kv.Key)) {
@@ -172,7 +172,7 @@ namespace LobstersUnited.HumbleDI.Editor {
             // var id = GUIUtility.GetControlID(FocusType.Keyboard, pos);
             var startY = pos.y;
 
-            var listMgr = listManagers.GetValueOrDefault(index);
+            var listMgr = listDrawers.GetValueOrDefault(index);
             if (listMgr == null) {
                 return 0;
             }
@@ -294,15 +294,16 @@ namespace LobstersUnited.HumbleDI.Editor {
 
         public void Disable() {
             isInit = false;
+            objectManager.Cleanup();
             objectManager = null;
             
             iFaceFields.Clear();
             iFaceFieldCategories.Clear();
 
-            foreach (var mgr in listManagers.Values) {
-                mgr.Dispose();
+            foreach (var drawer in listDrawers.Values) {
+                drawer.Dispose();
             }
-            listManagers.Clear();
+            listDrawers.Clear();
 
             iDeps = null;
         }
@@ -321,7 +322,7 @@ namespace LobstersUnited.HumbleDI.Editor {
                 iFaceFieldCategories.Add(cat);
                 if (cat is IFaceFieldCategory.LIST or IFaceFieldCategory.ARRAY) {
                     var listMgr = new ListFieldDrawer(field, objectManager.actualTarget, objectManager);
-                    listManagers.Add(count, listMgr);
+                    listDrawers.Add(count, listMgr);
                 }
                 count++;
             }

@@ -76,26 +76,29 @@ namespace LobstersUnited.HumbleDI.Editor {
             return DragAndDrop.activeControlID == id;
         }
         
-        public static void ProcessFocus(Rect rect, int id, Action onFocus = null) {
+        public static bool ProcessFocus(Rect rect, int id, Action onFocus = null) {
             var currentEvent = Event.current;
             if (!rect.Contains(currentEvent.mousePosition))
-                return;
+                return false;
             if (currentEvent.type == EventType.MouseDown) {
                 GUIUtility.hotControl = id;
                 GUIUtility.keyboardControl = id;
-                onFocus?.Invoke();
-            } else if (currentEvent.type == EventType.MouseUp){
+                return true;
+            } 
+            if (currentEvent.type == EventType.MouseUp){
                 GUIUtility.hotControl = 0;
             }
+            return false;
         }
         
-        public static void ProcessMouseDown(Rect rect, Action<Vector2> callback, bool use = true) {
+        public static Vector2? ProcessMouseDown(Rect rect, bool use = true) {
             var currentEvent = Event.current;
             if (currentEvent.type == EventType.MouseDown && rect.Contains(currentEvent.mousePosition)) {
                 if (use) 
                     currentEvent.Use();
-                callback(currentEvent.mousePosition);
+                return currentEvent.mousePosition;
             }
+            return null;
         }
 
         public static Object ProcessDragAndDrop(int id, Rect fieldRect, Func<Object, Object> validateCb) {
@@ -178,9 +181,10 @@ namespace LobstersUnited.HumbleDI.Editor {
             ProcessFocus(pos, id);
 
             // process click on the label
-            ProcessMouseDown(labelPos, mousePos => {
+            var labelClick = ProcessMouseDown(labelPos);
+            if (labelClick != null) {
                 result = !result;
-            });
+            }
 
             // draw label
             var labelStyle = new GUIStyle(EditorStyles.boldLabel);

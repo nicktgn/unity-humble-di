@@ -23,9 +23,15 @@ OR
 
 ## Features
 
+- Serializable interface fields
+- Custom inspector for interface fields
+- Support for array and list of interfaces
+- `IProvider<>` interface to use POCO (plain old c# object) objects as dependencies
+- TODO: Specialized component for centralized dependency resolution
+
 ### Serializable interface fields
 Saves the assigned references to `MonoBehaviours` or `ScriptableObjects` that implement 
-specified interfaces. **Lists and Arrays of interface types also supported**
+specified interfaces. **Lists and Arrays of interface types are also supported**
 
 ```csharp
 public interface IFace {
@@ -43,10 +49,13 @@ public class MyMonoBehaviour : MonoBehaviour {
     // THIS IS REQUIRED PART
     [SerializeField] InterfaceDependencies iDeps;
 
+    // This is now exposed as object field in inspector
     IFace myDependency;
     
+    // This is now exposed as list of object fields in inspector
     List<IFace> listOfDependencies;
     
+    // This is now exposed as list of object fields in inspector
     Iface[] arrayOfDependencies;
 
     void Start() {
@@ -57,10 +66,10 @@ public class MyMonoBehaviour : MonoBehaviour {
 
 ### Custom inspector with custom object picker
 
-Adding `InterfaceDependecies` field to your `MonoBehaviour` or `ScriptableObject` is the only 
+Adding `InterfaceDependecies` field to `MonoBehaviour` or `ScriptableObject` is the only 
 thing that is required to enable custom serialization of interface fields and expose them
 in the inspector. Dependency fields support all the usual features like object picker and
-drag-and-drop of objects from Project or Scene views. If field value is set, clicking on the 
+drag-and-drop from Project or Scene views. If field value is set, clicking on the 
 field will highlight the object in Project or Scene view (depending on where it came from).
 
 ![inspector](./Documentation~/inspector.png) 

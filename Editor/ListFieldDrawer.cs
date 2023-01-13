@@ -120,18 +120,19 @@ namespace LobstersUnited.HumbleDI.Editor {
             // process clicks
             // reduce trigger area of the field because covered by the picker icon
             fieldPos.width -= DrawerUtils.pickerWidth;
-            DrawerUtils.ProcessMouseDown(fieldPos, mousePosition => {
-                if (obj != null) {
-                    // Selection.objects = new[] { obj };
-                    EditorGUIUtility.PingObject(obj);
-                }
-            });
-            DrawerUtils.ProcessMouseDown(pickerRect, mousePosition => {
+            var fieldClick = DrawerUtils.ProcessMouseDown(fieldPos);
+            if (fieldClick != null && obj != null) {
+                // Selection.objects = new[] { obj };
+                EditorGUIUtility.PingObject(obj);
+            }
+
+            var pickerClick = DrawerUtils.ProcessMouseDown(pickerRect);
+            if (pickerClick != null) {
                 objectManager.OpenObjectPicker(itemType, pickedObject => {
                     SetObjectAsListItem(pickedObject, index);
                     GUI.changed = true;
                 });
-            });
+            }
         }
 
         void SetObjectAsListItem(Object obj, int index) {

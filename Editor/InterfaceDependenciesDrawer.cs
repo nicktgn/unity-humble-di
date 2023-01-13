@@ -260,18 +260,20 @@ namespace LobstersUnited.HumbleDI.Editor {
             fieldPos.width -= pickerWidth;
             
             // process clickss
-            DrawerUtils.ProcessMouseDown(fieldPos, mousePosition => {
+            var fieldClick = DrawerUtils.ProcessMouseDown(fieldPos);
+            if (fieldClick != null) {
                 if (obj != null) {
                     // Selection.objects = new[] { obj };
                     EditorGUIUtility.PingObject(obj);
                 }
-            });
-            DrawerUtils.ProcessMouseDown(pickerRect, mousePosition => {
+            }
+            var pickerClick = DrawerUtils.ProcessMouseDown(pickerRect);
+            if (pickerClick != null) {
                 objectManager.OpenObjectPicker(field.FieldType, pickedObject => {
                     objectManager.SetObjectToField(field, pickedObject);
                     GUI.changed = true;
                 });
-            });
+            }
 
             pos.y += lineHeight;
             return pos.y - startY;

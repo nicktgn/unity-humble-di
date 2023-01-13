@@ -329,10 +329,6 @@ namespace LobstersUnited.HumbleDI {
             Debug.Log("Deserializing...");
             Dictionary<string, FieldInfo> dict;
             dict = GetCompatibleFields(obj.GetType()).ToDictionary(f => f.Name);
-            if (fieldInfos == null) {
-                Debug.Log("Why would this be null????");
-                Debug.Log(Thread.CurrentThread.ManagedThreadId);
-            }
             var count = fieldInfos.Length;
 
             var mappedIndex = 0;

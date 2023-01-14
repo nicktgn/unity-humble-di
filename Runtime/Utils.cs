@@ -72,10 +72,6 @@ namespace LobstersUnited.HumbleDI {
             return name;
         }
 
-        public static IEnumerable<ProviderAttribute> GetProviderAttributes(this Type type) {
-            return type.GetCustomAttributes<ProviderAttribute>();
-        }
-
         #endregion
         
         

@@ -31,8 +31,6 @@ namespace LobstersUnited.HumbleDI.Editor {
     
     internal static class DrawerUtils {
         
-        static Object dndObject = null;
-        
         public static Texture2D iconPick = (Texture2D) EditorGUIUtility.IconContent("d_pick").image;
 
         public static float lineHeight = EditorGUIUtility.singleLineHeight;

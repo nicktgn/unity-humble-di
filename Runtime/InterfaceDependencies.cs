@@ -24,7 +24,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using System.Threading;
 using JetBrains.Annotations;
 using UnityEngine;
 using Object = UnityEngine.Object;
@@ -113,7 +112,6 @@ namespace LobstersUnited.HumbleDI {
         /// <param name="iDepsPath">path of the InterfaceDependencies field (incl. field's name) inside the target Unity Object</param>
         /// <param name="validationLevel">level of validation to be performed for each mapped field on deserialization</param>
         public InterfaceDependencies(Object target, string iDepsPath = "", int validationLevel = 0) {
-            Debug.Log("Is this ever called?");
             SetTarget(target, iDepsPath);
             this.validationLevel = validationLevel;
         }
@@ -150,14 +148,13 @@ namespace LobstersUnited.HumbleDI {
         public void OnBeforeSerialize() {
             EnsureLockExists();
             // This might be running not on the main thread, need to avoid `== null` comparisons
-            // Debug.Log($"{target} serialize: ");
             try {
                 lock (serializeLock) {
                     var targetObj = GetTargetObject(target, targetPath);
                     Serialize(targetObj);    
                 }
-            } catch (Exception e) {
-                Debug.Log($"Serialize fail: {e}");
+            } catch {
+                // Debug.Log($"Serialize fail: {e}");
                 // ignored
             }
         }
@@ -170,8 +167,8 @@ namespace LobstersUnited.HumbleDI {
                     var targetObj = GetTargetObject(target, targetPath);
                     Deserialize(targetObj);
                 }
-            } catch (Exception e) {
-                Debug.Log($"Deserialize fail: {e}");
+            } catch {
+                // Debug.Log($"Deserialize fail: {e}");
                 // ignored
             }
         }
@@ -326,7 +323,6 @@ namespace LobstersUnited.HumbleDI {
         }
         
         void Deserialize(object obj) {
-            Debug.Log("Deserializing...");
             Dictionary<string, FieldInfo> dict;
             dict = GetCompatibleFields(obj.GetType()).ToDictionary(f => f.Name);
             var count = fieldInfos.Length;

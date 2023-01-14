@@ -71,7 +71,6 @@ namespace LobstersUnited.HumbleDI.Editor {
             var obj = iDepsField.GetValue(actualTarget);
             switch (obj) {
                 case null:
-                    // Debug.Log("CREATE new Instance of InterfaceDependencies");
                     obj = new InterfaceDependencies(target, iDepsFieldPath);
                     iDepsField.SetValue(actualTarget, obj);
                     break;

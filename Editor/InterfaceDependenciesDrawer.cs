@@ -46,7 +46,7 @@ namespace LobstersUnited.HumbleDI.Editor {
         SerializedProperty isFoldout;
         static readonly string isFoldoutPropName = "isFoldout";
         InterfaceDependencies iDeps;
-        
+
         // Draw the property inside the given rect
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label) {
             isFoldout = property.FindPropertyRelative(isFoldoutPropName);
@@ -231,7 +231,7 @@ namespace LobstersUnited.HumbleDI.Editor {
             var fieldPos = EditorGUI.PrefixLabel(labelPos, id, new GUIContent(label), labelStyle);
             labelPos.width = EditorGUIUtility.labelWidth;
 
-            DrawerUtils.ProcessDragAndDrop(id, fieldPos, true, 
+            DrawerUtils.ProcessDragAndDrop(id, fieldPos, !objectManager.IsPersistent, 
                 objToValidate => Utils.FindComponentOrSO(field.FieldType, objToValidate),
                 drop => {
                     objectManager.SetObjectToField(field, drop);
@@ -313,7 +313,7 @@ namespace LobstersUnited.HumbleDI.Editor {
             iFaceFields = new List<FieldInfo>();
             iFaceFieldCategories = new List<IFaceFieldCategory>();
             
-            var type = objectManager.actualTarget.GetType();
+            var type = objectManager.ActualTarget.GetType();
             var count = 0;
             foreach (var field in InterfaceDependencies.GetCompatibleFields(type)){
                 iFaceFields.Add(field);
@@ -321,7 +321,7 @@ namespace LobstersUnited.HumbleDI.Editor {
                 var cat = InterfaceDependencies.GetIFaceFieldTypeCategory(field.FieldType);
                 iFaceFieldCategories.Add(cat);
                 if (cat is IFaceFieldCategory.LIST or IFaceFieldCategory.ARRAY) {
-                    var listMgr = new ListFieldDrawer(field, objectManager.actualTarget, objectManager);
+                    var listMgr = new ListFieldDrawer(field, objectManager.ActualTarget, objectManager);
                     listDrawers.Add(count, listMgr);
                 }
                 count++;

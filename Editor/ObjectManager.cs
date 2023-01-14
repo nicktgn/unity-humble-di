@@ -33,26 +33,33 @@ using Object = UnityEngine.Object;
 namespace LobstersUnited.HumbleDI.Editor {
     
     internal class ObjectManager {
+        
+        /// <summary>
+        /// True if the target inspected object is persistent (stored on disk, like SO asset); false if it's a scene object
+        /// </summary>
+        public bool IsPersistent { get; }
 
         /// <summary>
         /// Unity Object target (target of the Inspector)
         /// </summary>
-        public Object target;
-       
+        public Object Target { get; private set; }
+
         /// <summary>
         /// Actual c# object which contains InterfaceDependencies field. Can be nested inside of `target` or `target` itself
         ///  depending on the `SerializedProperty.propertyPath` 
         /// </summary>
-        public object actualTarget;
-
+        public object ActualTarget { get; private set; }
+        
         /// <summary>
         /// Caching the assigned values of the interface fields to avoid serialization / deserialization timing bugs
         /// </summary>
         Dictionary<FieldInfo, Object> fieldCache;
 
         public ObjectManager(Object target, string iDepsFieldPath) {
-            this.target = target;
-            actualTarget = InterfaceDependencies.GetTargetObjectRelativeToIDeps(target, iDepsFieldPath);
+            Target = target;
+            ActualTarget = InterfaceDependencies.GetTargetObjectRelativeToIDeps(target, iDepsFieldPath);
+
+            IsPersistent = EditorUtility.IsPersistent(target);
 
             fieldCache = new Dictionary<FieldInfo, Object>();
         }
@@ -62,43 +69,43 @@ namespace LobstersUnited.HumbleDI.Editor {
         }
 
         public void Cleanup() {
-            target = null;
-            actualTarget = null;
+            Target = null;
+            ActualTarget = null;
             fieldCache.Clear();
         }
 
         public InterfaceDependencies BindInterfaceDependencies(FieldInfo iDepsField, string iDepsFieldPath) {
-            var obj = iDepsField.GetValue(actualTarget);
+            var obj = iDepsField.GetValue(ActualTarget);
             switch (obj) {
                 case null:
-                    obj = new InterfaceDependencies(target, iDepsFieldPath);
-                    iDepsField.SetValue(actualTarget, obj);
+                    obj = new InterfaceDependencies(Target, iDepsFieldPath);
+                    iDepsField.SetValue(ActualTarget, obj);
                     break;
                 case InterfaceDependencies iDeps:
-                    iDeps.SetTarget(target, iDepsFieldPath);
+                    iDeps.SetTarget(Target, iDepsFieldPath);
                     break;
             }
             return obj as InterfaceDependencies;
         }
-
+        
         public void OpenObjectPicker(Type type, Action<Object> pickCallback) {
-            InterfaceSearchProvider.OpenInterfacePicker(type, pickedObject => {
+            InterfaceSearchProvider.OpenInterfacePicker(type, !IsPersistent, pickedObject => {
                 var componentOrSO = Utils.FindComponentOrSO(type, pickedObject);
                 pickCallback(componentOrSO);
             });
         }
 
         public void RecordUndo() {
-            Undo.RecordObject(target, "Set interface field ref");
+            Undo.RecordObject(Target, "Set interface field ref");
         }
 
         public void RecordUndoHierarchy() {
-            Undo.RegisterFullObjectHierarchyUndo(target, "Set interface field list item");
+            Undo.RegisterFullObjectHierarchyUndo(Target, "Set interface field list item");
         }
 
         public void SetObjectToField(FieldInfo field, Object pickedObj) {
             RecordUndo();
-            field.SetValue(actualTarget, pickedObj);
+            field.SetValue(ActualTarget, pickedObj);
             
             fieldCache[field] = pickedObj;
         }
@@ -106,7 +113,7 @@ namespace LobstersUnited.HumbleDI.Editor {
         public Object GetMappedObjectForField(FieldInfo field) {
             var obj = fieldCache.GetValueOrDefault(field);
             if (obj == null) {
-                obj = field.GetValue(actualTarget) as Object;
+                obj = field.GetValue(ActualTarget) as Object;
                 fieldCache[field] = obj;
             }
             return obj;

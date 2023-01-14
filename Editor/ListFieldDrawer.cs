@@ -88,7 +88,7 @@ namespace LobstersUnited.HumbleDI.Editor {
             });
             
             // handle DnD
-            DrawerUtils.ProcessDragAndDrop(id, fieldPos, true, 
+            DrawerUtils.ProcessDragAndDrop(id, fieldPos, !objectManager.IsPersistent, 
                 objToValidate => Utils.FindComponentOrSO(itemType, objToValidate),
                 drop => {
                     SetObjectAsListItem(drop, index);

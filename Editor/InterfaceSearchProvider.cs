@@ -23,6 +23,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using PlasticGui;
 using UnityEditor;
 using UnityEditor.Search;
 using UnityEngine;
@@ -173,6 +174,7 @@ namespace LobstersUnited.HumbleDI.Editor {
         static SearchProvider sceneProvider;
         static SearchProvider assetProvider;
 
+        static bool _allowSceneObjects = true;
         static Type _pickType; 
         static Action<Object> _pickCallback;
 
@@ -188,18 +190,27 @@ namespace LobstersUnited.HumbleDI.Editor {
                 );
         }
 
-        public static void OpenInterfacePicker(Type type = null, Action<Object> pickCallback = null) {
+        public static void OpenInterfacePicker(Type type = null, bool allowSceneObjects = false, Action<Object> pickCallback = null) {
             _pickCallback = pickCallback;
             _pickType = type;
-            
-            var builtinSceneSearch = new BuiltInProviderSearch(
-                SearchService.GetProvider(Commons.SCENE_PROVIDER));
-            var builtinAssetSearch = new BuiltInProviderSearch(
-                SearchService.GetProvider(Commons.ASSET_PROVIDER));
-            var sceneProvider = new InterfaceSceneSearchBuilder(builtinSceneSearch, type).Build();
-            var assetProvider = new InterfaceAssetSearchBuilder(builtinAssetSearch, type).Build();
+            _allowSceneObjects = allowSceneObjects;
+
+            assetProvider = new InterfaceAssetSearchBuilder(
+                new BuiltInProviderSearch(SearchService.GetProvider(Commons.ASSET_PROVIDER)),
+                type
+            ).Build();
+            if (allowSceneObjects) {
+                sceneProvider = new InterfaceSceneSearchBuilder(
+                    new BuiltInProviderSearch(SearchService.GetProvider(Commons.SCENE_PROVIDER)),
+                    type
+                ).Build();
+            }
+
+            var providers = allowSceneObjects
+                ? new[] { sceneProvider, assetProvider }
+                : new[] { assetProvider };
             var context = SearchService.CreateContext(
-                new [] { sceneProvider, assetProvider },
+                providers,
                 searchText: "",
                 flags: SearchFlags.Sorted | SearchFlags.OpenPicker
             );
@@ -272,19 +283,21 @@ namespace LobstersUnited.HumbleDI.Editor {
         static IEnumerable<SearchItem> FetchItems(SearchContext context, SearchProvider provider) {
             Commons.Log("ISP: search text " + context.searchText);
 
-            if (sceneProvider == null || assetProvider == null ||
+            if (assetProvider == null ||
                 (provider.isExplicitProvider && context.filterId != filterId))
                 yield break;
-            
-            foreach(var res in SearchInterfacesInScene(_pickType, context.searchQuery)) {
-                if (res != null) {
-                    var newItem = CreateItemFrom(res, provider, context, ReferenceSource.SCENE);
-                    yield return newItem;
-                } else {
-                    yield return null;
-                }
+
+            if (_allowSceneObjects && sceneProvider !=null) {
+                foreach(var res in SearchInterfacesInScene(_pickType, context.searchQuery)) {
+                    if (res != null) {
+                        var newItem = CreateItemFrom(res, provider, context, ReferenceSource.SCENE);
+                        yield return newItem;
+                    } else {
+                        yield return null;
+                    }
+                }    
             }
-            
+
             foreach(var res in SearchInterfacesInAssets(_pickType, context.searchQuery)) {
                 if (res != null) {
                     var newItem = CreateItemFrom(res, provider, context, ReferenceSource.ASSET);
@@ -367,6 +380,7 @@ namespace LobstersUnited.HumbleDI.Editor {
         }
 
         static void OnEnable() {
+            Debug.Log("InterfaceSearchProvider: On Enable");
             Commons.Log("InterfaceSearchProvider: On Enable");
             sceneProvider = SearchService.GetProvider(Commons.SCENE_PROVIDER);
             assetProvider = SearchService.GetProvider(Commons.ASSET_PROVIDER);

@@ -101,51 +101,44 @@ namespace LobstersUnited.HumbleDI.Editor {
             return null;
         }
 
-        public static Object ProcessDragAndDrop(int id, Rect fieldRect, Func<Object, Object> validateCb) {
-            var currentEvent = Event.current;
-            switch (currentEvent.type) {
-                case EventType.DragUpdated:
-                case EventType.DragPerform: {
-                    if (!fieldRect.Contains(currentEvent.mousePosition) || !GUI.enabled)
-                        return null;
-                
-                    var dnd = DragAndDrop.objectReferences.FirstOrDefault();
-                    if (dnd == null)
-                        return null;
-                
-                    DragAndDrop.visualMode = DragAndDropVisualMode.Generic;
-
-                    var validatedDnD = validateCb(dnd);
-                    if (validatedDnD == null) {
-                        DragAndDrop.visualMode = DragAndDropVisualMode.Rejected;
-                        dndObject = null;
-                        return null;
-                    }
-
-                    dndObject = validatedDnD;
-
-                    DragAndDrop.AcceptDrag();
-                    DragAndDrop.activeControlID = id;
-                    GUI.changed = true;
-                    Event.current.Use();
-                    return null;
-                }
+        public static void ProcessDragAndDrop(int id, Rect fieldRect, bool allowSceneObjects, Func<Object, Object> validateCb, Action<Object> onDrop) {
+            var eventType = Event.current.type;
+            switch (eventType) {
                 case EventType.DragExited:
-                    if (GUI.enabled) {
-                        Object drop = null;
-                        if (fieldRect.Contains(currentEvent.mousePosition) && dndObject != null) {
-                            // object can be set
-                            drop = dndObject;
-                            GUI.changed = true;
-                            dndObject = null;
-                        }
-                        DragAndDrop.activeControlID = 0;
+                    if (GUI.enabled)
                         HandleUtility.Repaint();
-                        return drop;
+                    break;
+                case EventType.DragUpdated:
+                case EventType.DragPerform:
+                    if (fieldRect.Contains(Event.current.mousePosition) && GUI.enabled) {
+                        Object obj = DragAndDrop.objectReferences.FirstOrDefault();
+                        Object validatedObj = validateCb(obj);
+                        
+                        if (validatedObj != null) {
+                            // If scene objects are not allowed and object is a scene object then clear
+                            if (!allowSceneObjects && !EditorUtility.IsPersistent(validatedObj))
+                                validatedObj = null;
+                        }
+
+                        if (validatedObj != null) {
+                            if (DragAndDrop.visualMode == DragAndDropVisualMode.None)
+                                DragAndDrop.visualMode = DragAndDropVisualMode.Generic;
+
+                            if (eventType == EventType.DragPerform) {
+                                onDrop(validatedObj);
+
+                                GUI.changed = true;
+                                DragAndDrop.AcceptDrag();
+                                DragAndDrop.activeControlID = 0;
+                            }
+                            else {
+                                DragAndDrop.activeControlID = id;
+                            }
+                            Event.current.Use();
+                        }
                     }
                     break;
             }
-            return null;
         }
 
         public static void DrawBox(Rect rect) {

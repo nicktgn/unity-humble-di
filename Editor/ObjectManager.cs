@@ -102,8 +102,6 @@ namespace LobstersUnited.HumbleDI.Editor {
             field.SetValue(actualTarget, pickedObj);
             
             fieldCache[field] = pickedObj;
-            
-            EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
         }
 
         public Object GetMappedObjectForField(FieldInfo field) {

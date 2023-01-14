@@ -79,20 +79,23 @@ namespace LobstersUnited.HumbleDI.Editor {
             CalculateLabelWithPrefix(rect, out var labelPos, out var fieldPos);
             DrawerUtils.GetPickerRect(fieldPos, out var pickerRect, out var iconRect);
             
-            // handle focus and DnD
+            // handle focus
             if (focused) {
                 GUIUtility.keyboardControl = id;
             }
             DrawerUtils.ProcessFocus(rect, id, () => {
                 gui.Select(index);
             });
-            var drop = DrawerUtils.ProcessDragAndDrop(id, fieldPos, objToValidate => Utils.FindComponentOrSO(itemType, objToValidate));
-            if (drop) {
-                // drop object is already a validated component or scriptable object here 
-                SetObjectAsListItem(drop, index);
-                obj = drop;
-            }
-
+            
+            // handle DnD
+            DrawerUtils.ProcessDragAndDrop(id, fieldPos, true, 
+                objToValidate => Utils.FindComponentOrSO(itemType, objToValidate),
+                drop => {
+                    SetObjectAsListItem(drop, index);
+                    obj = drop;
+                }
+            );
+            
             // Draw index label
             var label = new GUIContent(index.ToString());
             var labelStyle = new GUIStyle(EditorStyles.boldLabel);

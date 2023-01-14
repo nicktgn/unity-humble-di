@@ -230,14 +230,14 @@ namespace LobstersUnited.HumbleDI.Editor {
             }
             var fieldPos = EditorGUI.PrefixLabel(labelPos, id, new GUIContent(label), labelStyle);
             labelPos.width = EditorGUIUtility.labelWidth;
-            
-            var drop = DrawerUtils.ProcessDragAndDrop(id, fieldPos, objToValidate => Utils.FindComponentOrSO(field.FieldType, objToValidate));
-            if (drop) {
-                // drop object is already a validated component or scriptable object here 
-                objectManager.SetObjectToField(field, drop);
-                obj = drop;
-                Debug.Log("Dropped: " + obj);
-            }
+
+            DrawerUtils.ProcessDragAndDrop(id, fieldPos, true, 
+                objToValidate => Utils.FindComponentOrSO(field.FieldType, objToValidate),
+                drop => {
+                    objectManager.SetObjectToField(field, drop);
+                    obj = drop;
+                }
+            );
 
             // Draw field
             var isHovered = DrawerUtils.DetectHover(fieldPos);

@@ -138,6 +138,15 @@ namespace LobstersUnited.HumbleDI.Editor {
                     break;
             }
         }
+        
+        public static float DrawSeparatorLine(Rect line) {
+            var indent = DrawerUtils.IndentWidth;
+            line.x += 15 + indent;
+            line.width -= 16 + indent;
+            line.height = 2.0f;
+            EditorGUI.DrawRect(line, Color.gray);
+            return line.height;
+        }
 
         public static void DrawBox(Rect rect) {
             var indent = IndentWidth;

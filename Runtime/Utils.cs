@@ -49,6 +49,16 @@ namespace LobstersUnited.HumbleDI {
                 yield return field;
             }
         }
+        
+        public static IEnumerable<FieldInfo> GetFieldsWithAttribute(this Type type, Type attributeType) {
+            var fields = type.GetFields(ALL_INSTANCE_FIELDS);
+            foreach (var field in fields) {
+                var hasAttr = field.CustomAttributes.Any(a => a.AttributeType == attributeType);
+                if (hasAttr) {
+                    yield return field;
+                }
+            }
+        }
 
         public static FieldInfo GetInterfaceFieldOfType(this Type type, Type fieldType) {
             var fields = type.GetFields(ALL_INSTANCE_FIELDS);

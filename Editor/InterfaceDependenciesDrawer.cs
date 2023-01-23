@@ -47,13 +47,15 @@ namespace LobstersUnited.HumbleDI.Editor {
         static readonly string isFoldoutPropName = "isFoldout";
         InterfaceDependencies iDeps;
 
+        PropertyDependenciesDrawer propDependenciesDrawer; 
+        
         // Draw the property inside the given rect
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label) {
             isFoldout = property.FindPropertyRelative(isFoldoutPropName);
 
             property.serializedObject.Update();
 
-            Enable(property.serializedObject.targetObject, fieldInfo, property.propertyPath);
+            Enable(property, fieldInfo);
 
             DrawInterfaceDependenciesGUI(position);
             
@@ -75,6 +77,8 @@ namespace LobstersUnited.HumbleDI.Editor {
             var headerHeight = lineHeight + verticalSpacing * 2 + 2;
             var singularFieldsHeight = (iFaceFields.Count - listDrawers.Count) * lineWithSpacing;
             var listFieldsHeight = 0.0f;
+
+            var propertyDependenciesBlockHeight = propDependenciesDrawer.GetHeight();
             
             foreach (var kv in listDrawers) {
                 // foldout header for each list field
@@ -84,7 +88,8 @@ namespace LobstersUnited.HumbleDI.Editor {
                     // listFieldsHeight += verticalSpacing;
                 }
             }
-            return headerHeight + singularFieldsHeight + listFieldsHeight + verticalSpacing;
+
+            return headerHeight + singularFieldsHeight + listFieldsHeight + verticalSpacing + propertyDependenciesBlockHeight;
         }
 
         void DrawDependenciesSectionGUI(Rect pos) {
@@ -133,21 +138,12 @@ namespace LobstersUnited.HumbleDI.Editor {
             iDeps.SetListFoldout(fieldIndex, foldout);
         }
 
-        float DrawSeparatorLine(Rect line) {
-            var indent = DrawerUtils.IndentWidth;
-            line.x += 15 + indent;
-            line.width -= 16 + indent;
-            line.height = 2.0f;
-            EditorGUI.DrawRect(line, Color.gray);
-            return line.height;
-        }
-
         float DrawDependenciesSectionContentGUI(Rect pos) {
             var startY = pos.y;
             var verticalSpacing = DrawerUtils.verticalSpacing;
             
             pos.y += verticalSpacing;
-            pos.y += DrawSeparatorLine(pos);
+            pos.y += DrawerUtils.DrawSeparatorLine(pos);
             pos.y += verticalSpacing;
             
             EditorGUI.indentLevel += 1;
@@ -163,6 +159,9 @@ namespace LobstersUnited.HumbleDI.Editor {
                 pos.y += verticalSpacing;
             }
             
+            // Draw normal properties that were moved under "Dependencies" section
+            pos.y += propDependenciesDrawer.Draw(pos);
+
             EditorGUI.indentLevel -= 1;
             
             return pos.y - startY;
@@ -282,13 +281,16 @@ namespace LobstersUnited.HumbleDI.Editor {
         // --------------------------------- //
         #region SETUP
 
-        public void Enable(Object target, FieldInfo iDepsField, string iDepsFieldPath) {
+        //public void Enable(Object target, FieldInfo iDepsField, string iDepsFieldPath) {
+        public void Enable(SerializedProperty property, FieldInfo iDepsField) {
             if (isInit) return;
 
-            objectManager = new ObjectManager(target, iDepsFieldPath);
-            iDeps = objectManager.BindInterfaceDependencies(iDepsField, iDepsFieldPath);
+            objectManager = new ObjectManager(property);
+            iDeps = objectManager.BindInterfaceDependencies(iDepsField, property.propertyPath);
             
             EnumerateIFaceFields();
+
+            propDependenciesDrawer = new PropertyDependenciesDrawer(objectManager, iFaceFields);
             isInit = true;
         }
 
@@ -306,6 +308,8 @@ namespace LobstersUnited.HumbleDI.Editor {
             listDrawers.Clear();
 
             iDeps = null;
+
+            propDependenciesDrawer = null;
         }
         
 

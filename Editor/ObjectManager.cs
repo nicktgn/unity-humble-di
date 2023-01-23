@@ -24,15 +24,15 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using UnityEditor;
-using UnityEditor.SceneManagement;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 using Object = UnityEngine.Object;
 
 
 namespace LobstersUnited.HumbleDI.Editor {
     
     internal class ObjectManager {
+
+        SerializedProperty serializedProperty;
         
         /// <summary>
         /// True if the target inspected object is persistent (stored on disk, like SO asset); false if it's a scene object
@@ -55,11 +55,14 @@ namespace LobstersUnited.HumbleDI.Editor {
         /// </summary>
         Dictionary<FieldInfo, Object> fieldCache;
 
-        public ObjectManager(Object target, string iDepsFieldPath) {
-            Target = target;
-            ActualTarget = InterfaceDependencies.GetTargetObjectRelativeToIDeps(target, iDepsFieldPath);
+        public ObjectManager(SerializedProperty serializedProperty) {
+            this.serializedProperty = serializedProperty;
+            Target = serializedProperty.serializedObject.targetObject;
+            var iDepsFieldPath = serializedProperty.propertyPath;
+            
+            ActualTarget = InterfaceDependencies.GetTargetObjectRelativeToIDeps(Target, iDepsFieldPath);
 
-            IsPersistent = EditorUtility.IsPersistent(target);
+            IsPersistent = EditorUtility.IsPersistent(Target);
 
             fieldCache = new Dictionary<FieldInfo, Object>();
         }
@@ -69,6 +72,7 @@ namespace LobstersUnited.HumbleDI.Editor {
         }
 
         public void Cleanup() {
+            serializedProperty = null;
             Target = null;
             ActualTarget = null;
             fieldCache.Clear();
@@ -130,6 +134,29 @@ namespace LobstersUnited.HumbleDI.Editor {
             return new GUIContent(text, img);
         }
 
-        
+        static string GetParentPropertyPath(string propPath) {
+            if (string.IsNullOrEmpty(propPath))
+                return null;
+            var idx = propPath.LastIndexOf('.');
+            return idx < 0
+                ? null
+                : propPath[..idx];
+        }
+
+        static SerializedProperty GetParentSerializedProperty(SerializedProperty serializedProperty, string propPath) {
+            var parentPath = GetParentPropertyPath(propPath);
+            if (parentPath == null) {
+                return null;
+            }
+            return serializedProperty.serializedObject.FindProperty(parentPath);
+        }
+
+        public SerializedProperty GetSiblingSerializedProperty(string propPath) {
+            var parentProp = GetParentSerializedProperty(serializedProperty, serializedProperty.propertyPath);
+            if (parentProp == null) {
+                return serializedProperty.serializedObject.FindProperty(propPath);
+            }
+            return parentProp.FindPropertyRelative(propPath);
+        }
     }
 }

@@ -323,10 +323,13 @@ namespace LobstersUnited.HumbleDI {
         }
         
         void Deserialize(object obj) {
-            Dictionary<string, FieldInfo> dict;
-            dict = GetCompatibleFields(obj.GetType()).ToDictionary(f => f.Name);
             var count = fieldInfos.Length;
+            // early return if there's no interface fields serialized
+            if (count == 0)
+                return;
 
+            var dict = GetCompatibleFields(obj.GetType()).ToDictionary(f => f.Name);
+            
             var mappedIndex = 0;
             for (var i = 0; i < count; i++) {
                 var info = fieldInfos[i];

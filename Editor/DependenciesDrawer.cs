@@ -31,7 +31,7 @@ using Object = UnityEngine.Object;
 namespace LobstersUnited.HumbleDI.Editor {
 
     [CustomPropertyDrawer(typeof(InterfaceDependencies))]
-    internal class InterfaceDependenciesDrawer : PropertyDrawer, IDisposable {
+    internal class DependenciesDrawer : PropertyDrawer, IDisposable {
 
         float totalHeight;
 
@@ -47,8 +47,8 @@ namespace LobstersUnited.HumbleDI.Editor {
         static readonly string isFoldoutPropName = "isFoldout";
         InterfaceDependencies iDeps;
 
-        PropertyDependenciesDrawer propDependenciesDrawer; 
-        
+        PropertyDependenciesDrawer propDependenciesDrawer;
+
         // Draw the property inside the given rect
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label) {
             isFoldout = property.FindPropertyRelative(isFoldoutPropName);
@@ -350,7 +350,7 @@ namespace LobstersUnited.HumbleDI.Editor {
             Dispose(true);
             GC.SuppressFinalize(this);
         }
-        ~InterfaceDependenciesDrawer() {
+        ~DependenciesDrawer() {
             Dispose(false);
         }
         

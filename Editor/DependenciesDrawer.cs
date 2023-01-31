@@ -25,29 +25,26 @@ using System.Collections.Generic;
 using System.Reflection;
 using UnityEngine;
 using UnityEditor;
-using Object = UnityEngine.Object;
 
 
 namespace LobstersUnited.HumbleDI.Editor {
 
     [CustomPropertyDrawer(typeof(InterfaceDependencies))]
     internal class DependenciesDrawer : PropertyDrawer, IDisposable {
-
+        
         float totalHeight;
 
         bool isInit;
 
-        List<FieldInfo> iFaceFields;
-        List<IFaceFieldCategory> iFaceFieldCategories;
-
+        DependencyManager dependencies;
+        
         ObjectManager objectManager;
         Dictionary<int, ListFieldDrawer> listDrawers = new Dictionary<int, ListFieldDrawer>();
 
         SerializedProperty isFoldout;
         static readonly string isFoldoutPropName = "isFoldout";
         InterfaceDependencies iDeps;
-
-        PropertyDependenciesDrawer propDependenciesDrawer;
+        
 
         // Draw the property inside the given rect
         public override void OnGUI(Rect position, SerializedProperty property, GUIContent label) {
@@ -75,11 +72,11 @@ namespace LobstersUnited.HumbleDI.Editor {
             var verticalSpacing = DrawerUtils.verticalSpacing;
             var lineWithSpacing = lineHeight + verticalSpacing;
             var headerHeight = lineHeight + verticalSpacing * 2 + 2;
-            var singularFieldsHeight = (iFaceFields.Count - listDrawers.Count) * lineWithSpacing;
-            var listFieldsHeight = 0.0f;
-
-            var propertyDependenciesBlockHeight = propDependenciesDrawer.GetHeight();
+            var singularFieldsHeight = 
+                (dependencies.InterfaceDependencyCount - dependencies.InterfaceListDependencyCount) * lineWithSpacing;
             
+            // calculate height of all interface list drawers
+            var listFieldsHeight = 0.0f;
             foreach (var kv in listDrawers) {
                 // foldout header for each list field
                 listFieldsHeight += lineWithSpacing;
@@ -88,10 +85,17 @@ namespace LobstersUnited.HumbleDI.Editor {
                     // listFieldsHeight += verticalSpacing;
                 }
             }
+            
+            // calculate height of all normal property drawers that are added to "Dependencies" section
+            var normalPropsBlockHeight = 0.0f;
+            foreach (var normalDep in dependencies.NormalFields) {
+                var serializedProp = normalDep.SerializedProperty;
+                normalPropsBlockHeight += EditorGUI.GetPropertyHeight(serializedProp, true) + verticalSpacing;
+            }
 
-            return headerHeight + singularFieldsHeight + listFieldsHeight + verticalSpacing + propertyDependenciesBlockHeight;
+            return headerHeight + singularFieldsHeight + listFieldsHeight + verticalSpacing + normalPropsBlockHeight;
         }
-
+        
         void DrawDependenciesSectionGUI(Rect pos) {
             var startY = pos.y; // pos.yMin;
             
@@ -108,7 +112,8 @@ namespace LobstersUnited.HumbleDI.Editor {
             // draw foldout
             var foldoutPos = pos;
             foldoutPos.height = DrawerUtils.lineHeight;
-            foldout = DrawerUtils.DrawFoldout(foldoutPos, foldout, "Dependencies");
+            // foldout = DrawerUtils.DrawFoldout(foldoutPos, foldout, "Dependencies");
+            foldout = DrawerUtils.DrawFoldoutCustomLabel(foldoutPos, foldout, DrawDependencyLabelWithShortStats);
             pos.y += DrawerUtils.lineHeight;
             
             if (foldout) {
@@ -121,6 +126,18 @@ namespace LobstersUnited.HumbleDI.Editor {
             // update full height of the section
             totalHeight = pos.y - startY;
         }
+        
+        void DrawDependencyLabelWithShortStats(Rect pos, bool hasFocus) {
+            var label = new GUIContent("Dependencies");
+            
+            var labelStyle = new GUIStyle(EditorStyles.boldLabel);
+            if (hasFocus) {
+                labelStyle.normal.textColor = EditorStyles.foldout.active.textColor;
+            }
+            EditorGUI.LabelField(pos, label, labelStyle);
+            
+            DependencyIndicatorDrawer.DrawShortStats(pos, dependencies.UpdateStats());
+        }
 
         void SaveFoldoutState(bool foldout) {
             if (foldout == iDeps.IsFoldout)
@@ -128,14 +145,6 @@ namespace LobstersUnited.HumbleDI.Editor {
             // TODO: consider if this is necessary
             // EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
             iDeps.IsFoldout = foldout;
-        }
-
-        void SaveListFoldoutState(int fieldIndex, bool foldout) {
-            if (foldout == iDeps.IsListFoldout(fieldIndex))
-                return;
-            // TODO: consider if this is necessary
-            // EditorSceneManager.MarkSceneDirty(SceneManager.GetActiveScene());
-            iDeps.SetListFoldout(fieldIndex, foldout);
         }
 
         float DrawDependenciesSectionContentGUI(Rect pos) {
@@ -147,27 +156,30 @@ namespace LobstersUnited.HumbleDI.Editor {
             pos.y += verticalSpacing;
             
             EditorGUI.indentLevel += 1;
-            
-            for (var i = 0; i < iFaceFields.Count; i++) {
-                var field = iFaceFields[i];
-                var cat = iFaceFieldCategories[i];
+
+            var index = 0;
+            foreach (var dep in dependencies.Interfaces) {
+                var cat = dep.InterfaceCategory;
                 if (cat == IFaceFieldCategory.SINGULAR) {
-                    pos.y += DrawInterfacePropertyGUI(pos, i, field, objectManager.GetMappedObjectForField(field));
+                    pos.y += DrawInterfacePropertyGUI(pos, index, dep);
                 } else {
-                    pos.y += DrawInterfaceListGUI(pos, i, field);
+                    pos.y += DrawInterfaceListGUI(pos, index, dep);
                 }
                 pos.y += verticalSpacing;
+                index++;
             }
             
             // Draw normal properties that were moved under "Dependencies" section
-            pos.y += propDependenciesDrawer.Draw(pos);
+            pos.y += DrawNormalDependencyPropsGUI(pos);
 
             EditorGUI.indentLevel -= 1;
             
             return pos.y - startY;
         }
 
-        float DrawInterfaceListGUI(Rect pos, int index, FieldInfo listField) {
+        float DrawInterfaceListGUI(Rect pos, int index, DependencyInfo dep) {
+            var listField = dep.Field;
+            
             // var id = GUIUtility.GetControlID(FocusType.Keyboard, pos);
             var startY = pos.y;
 
@@ -178,6 +190,9 @@ namespace LobstersUnited.HumbleDI.Editor {
 
             var listFoldout = iDeps.IsListFoldout(index);
 
+            // Draw stat indicator
+            DependencyIndicatorDrawer.DrawDependencyIndicator(pos, dependencies, dep);
+            
             // draw foldout header - labeled with field name
             var label = ObjectNames.NicifyVariableName(listField.Name);
             var labelPos = pos;
@@ -207,7 +222,10 @@ namespace LobstersUnited.HumbleDI.Editor {
             return pos.y - startY;
         }
 
-        float DrawInterfacePropertyGUI(Rect pos, int index, FieldInfo field, Object obj) {
+        float DrawInterfacePropertyGUI(Rect pos, int index, DependencyInfo dep) {
+            var field = dep.Field;
+            var obj = objectManager.GetMappedObjectForField(field);
+
             var id = GUIUtility.GetControlID(FocusType.Keyboard, pos);
             var startY = pos.y;
 
@@ -218,6 +236,9 @@ namespace LobstersUnited.HumbleDI.Editor {
     
             // process focus
             DrawerUtils.ProcessFocus(pos, id);
+            
+            // Draw stat indicator
+            DependencyIndicatorDrawer.DrawDependencyIndicator(pos, dependencies, dep);
             
             // Draw label
             var label = ObjectNames.NicifyVariableName(field.Name);
@@ -277,20 +298,48 @@ namespace LobstersUnited.HumbleDI.Editor {
             pos.y += lineHeight;
             return pos.y - startY;
         }
+        
+        public float DrawNormalDependencyPropsGUI(Rect position) {
+            var startY = position.y;
+            position.height = DrawerUtils.lineHeight;
+            
+            foreach (var dep in dependencies.NormalFields) {
+                var serializedProp = dep.SerializedProperty;
+                
+                // Draw dependency indicator
+                DependencyIndicatorDrawer.DrawDependencyIndicator(position, dependencies, dep);
+                
+                // Draw property
+                var propPos = position;
+                // propPos.x += DependencyIndicatorDrawer.ICON_WIDTH_WITH_SPACING; 
+                EditorGUI.PropertyField(propPos, serializedProp, true);
+                position.y += EditorGUI.GetPropertyHeight(serializedProp, true) + DrawerUtils.verticalSpacing;
+            }
+
+            return position.y - startY;
+        }
 
         // --------------------------------- //
         #region SETUP
 
-        //public void Enable(Object target, FieldInfo iDepsField, string iDepsFieldPath) {
         public void Enable(SerializedProperty property, FieldInfo iDepsField) {
             if (isInit) return;
 
             objectManager = new ObjectManager(property);
             iDeps = objectManager.BindInterfaceDependencies(iDepsField, property.propertyPath);
-            
-            EnumerateIFaceFields();
 
-            propDependenciesDrawer = new PropertyDependenciesDrawer(objectManager, iFaceFields);
+            dependencies = new DependencyManager(objectManager);
+            
+            // create list field drawers
+            var count = 0;
+            foreach (var dep in dependencies.Interfaces) {
+                if (dep.CollectionWrapper == null)
+                    continue;
+                var listMgr = new ListFieldDrawer(dep.CollectionWrapper, objectManager);
+                listDrawers.Add(count, listMgr);
+                count++;
+            }
+            
             isInit = true;
         }
 
@@ -299,37 +348,12 @@ namespace LobstersUnited.HumbleDI.Editor {
             objectManager.Cleanup();
             objectManager = null;
             
-            iFaceFields.Clear();
-            iFaceFieldCategories.Clear();
-
             foreach (var drawer in listDrawers.Values) {
                 drawer.Dispose();
             }
             listDrawers.Clear();
 
             iDeps = null;
-
-            propDependenciesDrawer = null;
-        }
-        
-
-        void EnumerateIFaceFields() {
-            iFaceFields = new List<FieldInfo>();
-            iFaceFieldCategories = new List<IFaceFieldCategory>();
-            
-            var type = objectManager.ActualTarget.GetType();
-            var count = 0;
-            foreach (var field in InterfaceDependencies.GetCompatibleFields(type)){
-                iFaceFields.Add(field);
-                
-                var cat = InterfaceDependencies.GetIFaceFieldTypeCategory(field.FieldType);
-                iFaceFieldCategories.Add(cat);
-                if (cat is IFaceFieldCategory.LIST or IFaceFieldCategory.ARRAY) {
-                    var listMgr = new ListFieldDrawer(field, objectManager.ActualTarget, objectManager);
-                    listDrawers.Add(count, listMgr);
-                }
-                count++;
-            }
         }
 
         #endregion

@@ -30,7 +30,7 @@ using Object = UnityEngine.Object;
 namespace LobstersUnited.HumbleDI.Editor {
     
     internal static class DrawerUtils {
-        
+
         public static Texture2D iconPick = (Texture2D) EditorGUIUtility.IconContent("d_pick").image;
 
         public static float lineHeight = EditorGUIUtility.singleLineHeight;
@@ -159,6 +159,12 @@ namespace LobstersUnited.HumbleDI.Editor {
         }
 
         public static bool DrawFoldout(Rect pos, bool value, string label) {
+            return DrawFoldoutCustomLabel(pos, value, (labelPos, hasFocus) => {
+                DrawStringLabel(labelPos, label, hasFocus);
+            });
+        }
+
+        public static bool DrawFoldoutCustomLabel(Rect pos, bool value, Action<Rect, bool> drawLabel) {
             var id = GUIUtility.GetControlID(FocusType.Keyboard, pos);
             
             var indent = IndentWidth;
@@ -187,13 +193,17 @@ namespace LobstersUnited.HumbleDI.Editor {
             }
 
             // draw label
+            drawLabel(labelPos, HasKBFocus(id));
+            return result;
+        }
+
+        static void DrawStringLabel(Rect pos, string label, bool hasFocus) {
+            // draw label
             var labelStyle = new GUIStyle(EditorStyles.boldLabel);
-            if (HasKBFocus(id)) {
+            if (hasFocus) {
                 labelStyle.normal.textColor = EditorStyles.foldout.active.textColor;
             }
-            EditorGUI.LabelField(labelPos, label, labelStyle);
-
-            return result;
+            EditorGUI.LabelField(pos, label, labelStyle);
         }
     }
 }

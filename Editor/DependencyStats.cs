@@ -20,18 +20,12 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-using System;
-using UnityEngine;
 
-namespace LobstersUnited.HumbleDI {
-
-    [AttributeUsage(AttributeTargets.Field)]
-    public class DependencyAttribute : PropertyAttribute {
-
-        public bool External = false;
-
-        public bool Optional = false;
-        
+namespace LobstersUnited.HumbleDI.Editor {
+    internal struct DependencyStats {
+        public int Resolved;
+        public int Unresolved;
+        public int External;
+        public int Optional;
     }
-    
 }

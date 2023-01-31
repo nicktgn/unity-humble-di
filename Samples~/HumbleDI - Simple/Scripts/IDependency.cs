@@ -1,4 +1,4 @@
-namespace LobstersUnited.HumbleDI_Sample {
+namespace LobstersUnited.HumbleDI_Sample.Simple {
     
     public interface IDependency {
 

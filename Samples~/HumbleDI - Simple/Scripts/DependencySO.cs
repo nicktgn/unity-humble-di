@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace LobstersUnited.HumbleDI_Sample {
+namespace LobstersUnited.HumbleDI_Sample.Simple {
     
     [CreateAssetMenu(menuName = "HumbleDI/DependencySO")]
     public class DependencySO : ScriptableObject, IDependency {

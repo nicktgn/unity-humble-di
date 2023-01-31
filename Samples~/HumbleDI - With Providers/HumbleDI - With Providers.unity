@@ -177,7 +177,9 @@ MonoBehaviour:
     - rid: 3886025430854270976
       type: {class: InterfaceDependencies, ns: LobstersUnited.HumbleDI, asm: lobsters-united.humble-di}
       data:
-        isFoldout: 1
+        foldoutState: 1
+        listFieldsFoldoutStateKeys: 
+        listFieldsFoldoutStateValues: 
         validationLevel: 0
         target: {fileID: 148852530}
         targetPath: fourWheelEngine
@@ -187,11 +189,13 @@ MonoBehaviour:
             Assembly-CSharp, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null]][],
             lobsters-united.humble-di, Version=0.0.0.0, Culture=neutral, PublicKeyToken=null
           category: 2
-          length: 2
+          length: 4
           isInit: 1
         mappedObjects:
         - {fileID: 1540338914749949668}
         - {fileID: 0}
+        - {fileID: 1981541807}
+        - {fileID: 1540338914749949668}
 --- !u!4 &854748702 stripped
 Transform:
   m_CorrespondingSourceObject: {fileID: 1540338913914374397, guid: cf6f3604013dc0546bd36e6638762d12, type: 3}
@@ -435,7 +439,9 @@ MonoBehaviour:
     - rid: 3886025430854270978
       type: {class: InterfaceDependencies, ns: LobstersUnited.HumbleDI, asm: lobsters-united.humble-di}
       data:
-        isFoldout: 1
+        foldoutState: 1
+        listFieldsFoldoutStateKeys: 
+        listFieldsFoldoutStateValues: 
         validationLevel: 0
         target: {fileID: 1490749958}
         targetPath: fourWheelEngineList
@@ -452,7 +458,7 @@ MonoBehaviour:
         - {fileID: 0}
         - {fileID: 958918005}
         - {fileID: 0}
-        - {fileID: 0}
+        - {fileID: 1540338914749949668}
 --- !u!1 &1862774831
 GameObject:
   m_ObjectHideFlags: 0
@@ -507,7 +513,9 @@ MonoBehaviour:
     - rid: 3886025430854270977
       type: {class: InterfaceDependencies, ns: LobstersUnited.HumbleDI, asm: lobsters-united.humble-di}
       data:
-        isFoldout: 1
+        foldoutState: 1
+        listFieldsFoldoutStateKeys: 
+        listFieldsFoldoutStateValues: 
         validationLevel: 0
         target: {fileID: 1862774833}
         targetPath: oneWheelEngine
@@ -611,6 +619,17 @@ Transform:
   m_CorrespondingSourceObject: {fileID: 1540338913914374397, guid: cf6f3604013dc0546bd36e6638762d12, type: 3}
   m_PrefabInstance: {fileID: 1981541805}
   m_PrefabAsset: {fileID: 0}
+--- !u!114 &1981541807 stripped
+MonoBehaviour:
+  m_CorrespondingSourceObject: {fileID: 6326483843005020867, guid: cf6f3604013dc0546bd36e6638762d12, type: 3}
+  m_PrefabInstance: {fileID: 1981541805}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 254d6898380544de87bdefcab0da2b56, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
 --- !u!1001 &1540338914749949667
 PrefabInstance:
   m_ObjectHideFlags: 0

@@ -23,15 +23,17 @@ OR
 
 ## Features
 
-- Serializable interface fields
-- Custom inspector for interface fields
-- Support for array and list of interfaces
-- `IProvider<>` interface to use POCO (plain old c# object) objects as dependencies
-- TODO: Specialized component for centralized dependency resolution
+- **Serializable interface fields**
+  - Support for serializable Arrays and Lists of interfaces
+- **Custom inspector with custom object picker for interface dependencies**
+- `IProvider<>` interface to use POCO objects as dependencies
+- TODO: Auto-resolution of dependencies
+- TODO: Centralized dependency tree editor
 
 ### Serializable interface fields
 Saves the assigned references to `MonoBehaviours` or `ScriptableObjects` that implement 
-specified interfaces. **Lists and Arrays of interface types are also supported**
+specified interfaces. Provides the level of indirection ([Dependency Inversion](https://en.wikipedia.org/wiki/Dependency_inversion_principle))
+necessary for better code decoupling and flexible TDD development approach. **Lists and Arrays of interface types are also supported**
 
 ```csharp
 public interface IFace {
@@ -60,11 +62,12 @@ public class MyMonoBehaviour : MonoBehaviour {
 
     void Start() {
         myDependency.UseIt();
+        //...
     }
 }
 ```
 
-### Custom inspector with custom object picker
+### Custom inspector with custom object picker for interface dependencies
 
 Adding `InterfaceDependecies` field to `MonoBehaviour` or `ScriptableObject` is the only 
 thing that is required to enable custom serialization of interface fields and expose them

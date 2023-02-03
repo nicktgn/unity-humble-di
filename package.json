@@ -1,6 +1,6 @@
 {
     "name": "studio.lobsters-united.humble-di",
-    "version": "0.1.0",
+    "version": "0.2.0",
     "displayName": "Humble DI",
     "description": "Tiny DI library for Unity3D based on interface dependencies",
     "unity": "2021.1",

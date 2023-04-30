@@ -21,7 +21,6 @@
 // SOFTWARE.
 
 using System.Linq;
-using System.Reflection;
 using UnityEditor;
 using UnityEditorInternal;
 using UnityEngine;
@@ -36,8 +35,8 @@ namespace LobstersUnited.HumbleDI.Editor {
         ReorderableList gui;
         CollectionWrapper list;
 
-        public ListFieldDrawer(FieldInfo field, object target, ObjectManager objectManager) {
-            list = new CollectionWrapper(field, target);
+        public ListFieldDrawer(CollectionWrapper collectionWrapper, ObjectManager objectManager) {
+            list = collectionWrapper;
 
             gui = new ReorderableList(list, null, true, false, true, true) {
                 drawElementCallback = DrawElement,
@@ -139,8 +138,9 @@ namespace LobstersUnited.HumbleDI.Editor {
         }
 
         void SetObjectAsListItem(Object obj, int index) {
-            objectManager.RecordUndoHierarchy();
+            objectManager.RecordHierarchyChanges();
             list[index] = obj;
+            objectManager.RecordPrefabChanges();
         }
 
         void CalculateLabelWithPrefix(Rect totalPosition, out Rect labelPosition, out Rect fieldPosition) {
@@ -158,20 +158,23 @@ namespace LobstersUnited.HumbleDI.Editor {
         }
 
         void OnAdd(ReorderableList reorderableList) {
-            objectManager.RecordUndoHierarchy();
+            objectManager.RecordHierarchyChanges();
             list.Add(null);
+            objectManager.RecordPrefabChanges();
         }
 
         void OnRemove(ReorderableList reorderableList) {
-            objectManager.RecordUndoHierarchy();
+            objectManager.RecordHierarchyChanges();
             var selected = reorderableList.selectedIndices;
             var idx = selected.Count > 0 ? selected.FirstOrDefault() : list.Count - 1;
             list.RemoveAt(idx);
+            objectManager.RecordPrefabChanges();
         }
 
         void OnReorder(ReorderableList reorderableList, int index, int newIndex) {
-            objectManager.RecordUndoHierarchy();
+            objectManager.RecordHierarchyChanges();
             list.Reorder(index, newIndex);
+            objectManager.RecordPrefabChanges();
         }
 
         bool CanRemove(ReorderableList reorderableList) {

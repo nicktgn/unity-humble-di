@@ -1,8 +1,10 @@
 using UnityEngine;
 
-namespace LobstersUnited.HumbleDI_Sample  {
+namespace LobstersUnited.HumbleDI_Sample.Simple  {
     
     public class DependecyMB : MonoBehaviour, IDependency {
+        
+        [SerializeField] Character myChar;
         
         public string DoSomethingImportant(string input) {
             return $"Doing important work in Component with input '{input}'";

@@ -23,6 +23,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.Linq;
 using System.Reflection;
 
 namespace LobstersUnited.HumbleDI {
@@ -56,6 +57,16 @@ namespace LobstersUnited.HumbleDI {
         public Array AsArray => collection as Array;
 
         public IList AsIList => collection as IList;
+        
+        public bool AllNonNull {
+            get {
+                if (collection == null)
+                    return false;
+                return IsArray
+                    ? AsArray.Cast<object>().All(o => o != null)
+                    : AsIList.Cast<object>().All(o => o != null);
+            }
+        }
 
         public CollectionWrapper(FieldInfo field, object target) {
             this.field = field;

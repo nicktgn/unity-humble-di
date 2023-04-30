@@ -24,12 +24,20 @@ using System;
 using System.Collections.Generic;
 using System.Reflection;
 using UnityEditor;
+using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using Object = UnityEngine.Object;
 
 
 namespace LobstersUnited.HumbleDI.Editor {
-    
+
+    internal enum PrefabState {
+        NOT_A_PREFAB,   
+        PREFAB,
+        PREFAB_INSTANCE
+    }
+
     internal class ObjectManager {
 
         SerializedProperty serializedProperty;
@@ -38,6 +46,8 @@ namespace LobstersUnited.HumbleDI.Editor {
         /// True if the target inspected object is persistent (stored on disk, like SO asset); false if it's a scene object
         /// </summary>
         public bool IsPersistent { get; }
+
+        public PrefabState PrefabState { get; }
 
         /// <summary>
         /// Unity Object target (target of the Inspector)
@@ -63,7 +73,8 @@ namespace LobstersUnited.HumbleDI.Editor {
             ActualTarget = InterfaceDependencies.GetTargetObjectRelativeToIDeps(Target, iDepsFieldPath);
 
             IsPersistent = EditorUtility.IsPersistent(Target);
-
+            PrefabState = GetPrefabState(Target);
+            
             fieldCache = new Dictionary<FieldInfo, Object>();
         }
 
@@ -99,17 +110,25 @@ namespace LobstersUnited.HumbleDI.Editor {
             });
         }
 
-        public void RecordUndo() {
+        public void RecordChanges() {
             Undo.RecordObject(Target, "Set interface field ref");
         }
 
-        public void RecordUndoHierarchy() {
+        public void RecordHierarchyChanges() {
             Undo.RegisterFullObjectHierarchyUndo(Target, "Set interface field list item");
         }
 
+        public void RecordPrefabChanges() {
+            if (PrefabState == PrefabState.PREFAB_INSTANCE) {
+                PrefabUtility.RecordPrefabInstancePropertyModifications(Target);
+            }
+        }
+
         public void SetObjectToField(FieldInfo field, Object pickedObj) {
-            RecordUndo();
+            RecordChanges();
             field.SetValue(ActualTarget, pickedObj);
+
+            RecordPrefabChanges();
             
             fieldCache[field] = pickedObj;
         }
@@ -157,6 +176,27 @@ namespace LobstersUnited.HumbleDI.Editor {
                 return serializedProperty.serializedObject.FindProperty(propPath);
             }
             return parentProp.FindPropertyRelative(propPath);
+        }
+
+        PrefabState GetPrefabState(Object go) {
+            var prefabAsset = PrefabUtility.GetCorrespondingObjectFromSource(go);
+            var instanceHandle = PrefabUtility.GetPrefabInstanceHandle(go);
+            // var prefabAssetType = PrefabUtility.GetPrefabAssetType(go);
+            // var isPartOfAnyPrefab = PrefabUtility.IsPartOfAnyPrefab(go);
+            // var isPartOfPrefabInstance = PrefabUtility.IsPartOfPrefabInstance(go);
+            
+            // Debug.Log($"TARGET {go} | is persistent {IsPersistent} | prefabAsset {prefabAsset} | instanceHandle {instanceHandle} | prefabAssetType {prefabAssetType} | is part of prefab {isPartOfAnyPrefab} | is part of prefab instance {isPartOfPrefabInstance}");
+            
+            var asComponent = go as Component;
+            var scene = asComponent ? asComponent.gameObject.scene : (go as GameObject)!.scene;
+            var isPreviewScene = EditorSceneManager.IsPreviewScene(scene);
+            // Debug.Log($"Is preview scene {isPreviewScene}");
+
+            if (prefabAsset != null && instanceHandle != null)
+                return PrefabState.PREFAB_INSTANCE;
+            if (prefabAsset == null && instanceHandle == null && isPreviewScene)
+                return PrefabState.PREFAB;
+            return PrefabState.NOT_A_PREFAB;
         }
     }
 }
